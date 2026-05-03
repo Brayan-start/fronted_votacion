@@ -9,12 +9,49 @@ import { mockAdmin, mockUser } from '../../services/mockData';
 const Login: React.FC = () => {
   const [regUniv, setRegUniv] = useState('');
   const [idCard, setIdCard] = useState('');
+  const [regUnivError, setRegUnivError] = useState('');
+  const [idCardError, setIdCardError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const handleRegUnivChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setRegUniv(value);
+    
+    // Exception for mock admin
+    if (value === 'admin' || value === '') {
+      setRegUnivError('');
+      return;
+    }
+
+    if (!/^\d+$/.test(value)) {
+      setRegUnivError('El RU debe contener solo números');
+    } else {
+      setRegUnivError('');
+    }
+  };
+
+  const handleIdCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setIdCard(value);
+
+    // Exception for mock admin
+    if (value === 'admin' || value === '') {
+      setIdCardError('');
+      return;
+    }
+
+    if (!/^\d+$/.test(value)) {
+      setIdCardError('La cédula debe contener solo números');
+    } else {
+      setIdCardError('');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (regUnivError || idCardError) return;
     setLoading(true);
 
     // Simulando llamada a API
@@ -38,7 +75,8 @@ const Login: React.FC = () => {
           label="Registro Universitario"
           placeholder="Ej: 20210001"
           value={regUniv}
-          onChange={(e) => setRegUniv(e.target.value)}
+          onChange={handleRegUnivChange}
+          error={regUnivError}
           required
         />
         <Input
@@ -46,7 +84,8 @@ const Login: React.FC = () => {
           type="password"
           placeholder="********"
           value={idCard}
-          onChange={(e) => setIdCard(e.target.value)}
+          onChange={handleIdCardChange}
+          error={idCardError}
           required
         />
         <Button type="submit" size="full" loading={loading}>
