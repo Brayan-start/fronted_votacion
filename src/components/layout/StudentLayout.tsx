@@ -1,14 +1,17 @@
 import React from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Vote, LogOut, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
 
 import { MeshBackground } from './MeshBackground';
 
+import { motion, AnimatePresence } from 'framer-motion';
+
 const StudentLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
@@ -47,9 +50,18 @@ const StudentLayout: React.FC = () => {
       </header>
 
       <main className="flex-1 p-6 lg:p-10 relative z-10">
-        <div className="max-w-7xl mx-auto">
-          <Outlet />
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="max-w-7xl mx-auto"
+          >
+            <Outlet />
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       <footer className="bg-white/40 backdrop-blur-md border-t border-slate-200/50 py-8 relative z-10">
