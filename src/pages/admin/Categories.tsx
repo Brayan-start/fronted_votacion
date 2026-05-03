@@ -150,7 +150,6 @@ const Categories: React.FC = () => {
         isOpen={isSuccessModalOpen}
         onClose={() => setIsSuccessModalOpen(false)}
         title=""
-        showClose={false}
       >
         <div className="flex flex-col items-center justify-center py-6 text-center">
           <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
