@@ -23,7 +23,7 @@ const AdminLayout: React.FC = () => {
   const navigate = useNavigate();
 
   const menuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
+    { icon: LayoutDashboard, label: 'Inicio', path: '/admin/dashboard' },
     { icon: Vote, label: 'Elecciones', path: '/admin/elections' },
     { icon: Layers, label: 'Categorías', path: '/admin/categories' },
     { icon: Users, label: 'Candidatos', path: '/admin/candidates' },
@@ -59,7 +59,7 @@ const AdminLayout: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
                 <Vote size={24} />
               </div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">VotU</h1>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">UPEA <span className="text-blue-600">Vota</span></h1>
             </div>
             <button className="lg:hidden p-2 hover:bg-slate-100 rounded-lg" onClick={() => setIsSidebarOpen(false)}>
               <X size={20} />

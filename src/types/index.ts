@@ -6,8 +6,10 @@ export interface User {
   lastName: string;
   regUniv: string;
   idCard: string;
+  email: string;
   role: Role;
   photoUrl?: string;
+  career?: string;
 }
 
 export interface AuthState {
@@ -24,6 +26,7 @@ export interface Election {
   startDate: string;
   endDate: string;
   status: 'active' | 'inactive' | 'closed';
+  type: 'rectorado' | 'consejo' | 'carrera';
 }
 
 export interface Category {
@@ -39,4 +42,11 @@ export interface Candidate {
   photoUrl: string;
   videoUrl?: string;
   categoryId: string;
+  career?: string;
+}
+
+export interface Career {
+  id: string;
+  name: string;
+  faculty: string;
 }

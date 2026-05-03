@@ -1,29 +1,49 @@
 import React, { useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Search, UserMinus, UserCheck, Shield } from 'lucide-react';
+import { ConfirmModal } from '../../components/ui/ConfirmModal';
+import { Modal } from '../../components/ui/Modal';
+import { Search, UserMinus, UserCheck, Shield, CheckCircle2 } from 'lucide-react';
 
 const Students: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  
-  const mockStudents = [
+  const [students, setStudents] = useState([
     { id: '1', name: 'Juan Pérez', regUniv: '20210001', idCard: '12345678', status: 'verified' },
     { id: '2', name: 'María García', regUniv: '20210002', idCard: '87654321', status: 'verified' },
     { id: '3', name: 'Carlos López', regUniv: '20210003', idCard: '11223344', status: 'pending' },
-  ];
+  ]);
+  
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('¿Eliminar este estudiante del sistema?')) {
-      alert('Estudiante eliminado.');
+  const handleDeleteClick = (id: string) => {
+    setStudentToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (studentToDelete) {
+      setStudents(students.filter(s => s.id !== studentToDelete));
+      setIsDeleteModalOpen(false);
+      setStudentToDelete(null);
+      
+      setIsSuccessModalOpen(true);
+      setTimeout(() => setIsSuccessModalOpen(false), 2000);
     }
   };
+
+  const filteredStudents = students.filter(s => 
+    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.regUniv.includes(searchTerm) ||
+    s.idCard.includes(searchTerm)
+  );
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white drop-shadow-sm">Base de Datos de Estudiantes</h1>
-        <p className="text-slate-300 font-medium">Listado de usuarios habilitados para votar.</p>
+        <h1 className="text-2xl font-bold text-white drop-shadow-sm">Base de Datos de Estudiantes UPEA</h1>
+        <p className="text-slate-300 font-medium">Listado oficial de universitarios habilitados para el sufragio.</p>
       </div>
 
       <Card>
@@ -52,39 +72,72 @@ const Students: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {mockStudents.map((student) => (
-                <tr key={student.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs">
-                      {student.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <span className="font-medium text-gray-900">{student.name}</span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{student.regUniv}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{student.idCard}</td>
-                  <td className="px-6 py-4">
-                    <span className={`flex items-center gap-1 text-xs font-bold ${
-                      student.status === 'verified' ? 'text-green-600' : 'text-amber-600'
-                    }`}>
-                      {student.status === 'verified' ? <UserCheck size={14} /> : <Shield size={14} />}
-                      {student.status === 'verified' ? 'Verificado' : 'Pendiente'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => handleDelete(student.id)}
-                      className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                      title="Eliminar Estudiante"
-                    >
-                      <UserMinus size={18} />
-                    </button>
+              {filteredStudents.length > 0 ? (
+                filteredStudents.map((student) => (
+                  <tr key={student.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
+                        {student.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                      <span className="font-medium text-gray-900">{student.name}</span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{student.regUniv}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{student.idCard}</td>
+                    <td className="px-6 py-4">
+                      <span className={`flex items-center gap-1 text-xs font-bold ${
+                        student.status === 'verified' ? 'text-green-600' : 'text-amber-600'
+                      }`}>
+                        {student.status === 'verified' ? <UserCheck size={14} /> : <Shield size={14} />}
+                        {student.status === 'verified' ? 'Verificado' : 'Pendiente'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button 
+                        onClick={() => handleDeleteClick(student.id)}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Eliminar Estudiante"
+                      >
+                        <UserMinus size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
+                    No se encontraron estudiantes que coincidan con la búsqueda.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
       </Card>
+
+      <ConfirmModal 
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Eliminar Estudiante"
+        message="¿Estás seguro de que deseas eliminar a este estudiante? Esta acción revocará su acceso al sistema de votación de la UPEA."
+        confirmText="Eliminar permanentemente"
+        variant="danger"
+      />
+
+      <Modal
+        isOpen={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        title=""
+        showClose={false}
+      >
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+            <CheckCircle2 size={40} />
+          </div>
+          <h3 className="text-xl font-bold text-gray-900">¡Acción Completada!</h3>
+          <p className="text-gray-500 mt-2">El estudiante ha sido removido de la base de datos satisfactoriamente.</p>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { mockAdmin, mockUser } from '../../services/mockData';
+import { LogIn } from 'lucide-react';
 
 const Login: React.FC = () => {
   const [regUniv, setRegUniv] = useState('');
@@ -19,7 +20,6 @@ const Login: React.FC = () => {
     const value = e.target.value;
     setRegUniv(value);
     
-    // Exception for mock admin
     if (value === 'admin' || value === '') {
       setRegUnivError('');
       return;
@@ -36,7 +36,6 @@ const Login: React.FC = () => {
     const value = e.target.value;
     setIdCard(value);
 
-    // Exception for mock admin
     if (value === 'admin' || value === '') {
       setIdCardError('');
       return;
@@ -68,42 +67,54 @@ const Login: React.FC = () => {
   };
 
   return (
-    <Card>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Iniciar Sesión</h2>
-        <Input
-          label="Registro Universitario"
-          placeholder="Ej: 20210001"
-          value={regUniv}
-          onChange={handleRegUnivChange}
-          error={regUnivError}
-          required
-        />
-        <Input
-          label="Cédula de Identidad"
-          type="password"
-          placeholder="********"
-          value={idCard}
-          onChange={handleIdCardChange}
-          error={idCardError}
-          required
-        />
-        <Button type="submit" size="full" loading={loading}>
-          Entrar
-        </Button>
-        <div className="text-center text-sm text-gray-500">
-          ¿No tienes cuenta?{' '}
-          <Link to="/register" className="text-blue-600 hover:underline">
-            Regístrate aquí
-          </Link>
+    <div className="w-full max-w-md mx-auto">
+      <Card className="p-8">
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mb-4">
+            <LogIn className="text-blue-600" size={32} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Bienvenido de nuevo</h2>
+          <p className="text-gray-500 mt-2 text-center">Ingresa tus credenciales para acceder al sistema de votación UPEA</p>
         </div>
-        <div className="mt-4 p-3 bg-gray-50 rounded text-xs text-gray-500">
-          <p>Mock Credentials:</p>
-          <p>Admin: admin / admin</p>
-          <p>Student: cualquer / valor</p>
-        </div>
-      </form>
-    </Card>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Input
+            label="Registro Universitario (RU)"
+            placeholder="Ej: 20210001"
+            value={regUniv}
+            onChange={handleRegUnivChange}
+            error={regUnivError}
+            required
+          />
+          <Input
+            label="Cédula de Identidad (CI)"
+            type="password"
+            placeholder="Ingresa tu CI"
+            value={idCard}
+            onChange={handleIdCardChange}
+            error={idCardError}
+            required
+          />
+          
+          <Button type="submit" size="full" loading={loading} className="py-3">
+            Iniciar Sesión
+          </Button>
+
+          <div className="text-center pt-4 border-t">
+            <p className="text-sm text-gray-600">
+              ¿No tienes una cuenta activa?{' '}
+              <Link to="/register" className="text-blue-600 font-semibold hover:underline">
+                Regístrate ahora
+              </Link>
+            </p>
+          </div>
+        </form>
+      </Card>
+      
+      <p className="text-center mt-8 text-xs text-gray-400 uppercase tracking-widest">
+        Universidad Pública de El Alto &copy; 2026
+      </p>
+    </div>
   );
 };
 

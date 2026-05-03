@@ -18,6 +18,7 @@ import Elections from './pages/admin/Elections';
 import Categories from './pages/admin/Categories';
 import Candidates from './pages/admin/Candidates';
 import Students from './pages/admin/Students';
+import Results from './pages/admin/Results';
 
 // Student Pages
 import StudentDashboard from './pages/student/Dashboard';
@@ -47,7 +48,7 @@ const App: React.FC = () => {
             <Route path="elections" element={<Elections />} />
             <Route path="categories" element={<Categories />} />
             <Route path="candidates" element={<Candidates />} />
-            <Route path="results" element={<div className="p-4 bg-white rounded-lg shadow text-center py-20 text-gray-500">Módulo de resultados en tiempo real (Visualización de Gráficas)</div>} />
+            <Route path="results" element={<Results />} />
             <Route path="students" element={<Students />} />
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
           </Route>

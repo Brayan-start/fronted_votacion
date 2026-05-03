@@ -27,7 +27,7 @@ const StudentLayout: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform">
               <Vote size={24} />
             </div>
-            <span className="text-2xl font-black text-slate-900 tracking-tight">VotU</span>
+            <span className="text-2xl font-black text-slate-900 tracking-tight">UPEA <span className="text-blue-600">Vota</span></span>
           </Link>
 
           <div className="flex items-center gap-6">
@@ -66,7 +66,7 @@ const StudentLayout: React.FC = () => {
 
       <footer className="bg-white/40 backdrop-blur-md border-t border-slate-200/50 py-8 relative z-10">
         <div className="max-w-7xl mx-auto px-6 text-center text-slate-500 text-sm font-medium">
-          &copy; {new Date().getFullYear()} VotU &bull; Sistema de Votación Universitaria &bull; Versión 1.0
+          &copy; {new Date().getFullYear()} UPEA Vota &bull; Sistema de Votación Universitaria &bull; Universidad Pública de El Alto
         </div>
       </footer>
     </div>
