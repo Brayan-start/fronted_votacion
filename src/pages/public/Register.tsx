@@ -25,6 +25,13 @@ const Register: React.FC = () => {
     idCard: '',
     email: '',
   });
+  const [errors, setErrors] = useState({
+    name: '',
+    lastName: '',
+    regUniv: '',
+    idCard: '',
+    email: '',
+  });
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -32,10 +39,47 @@ const Register: React.FC = () => {
   const webcamRef = useRef<Webcam>(null);
   const navigate = useNavigate();
 
+  const validateField = (name: string, value: string) => {
+    let error = '';
+    switch (name) {
+      case 'name':
+      case 'lastName':
+        if (!value.trim()) error = 'Este campo es obligatorio';
+        else if (value.length < 2) error = 'Mínimo 2 caracteres';
+        break;
+      case 'regUniv':
+        if (!value) error = 'El RU es obligatorio';
+        else if (!/^\d+$/.test(value)) error = 'Debe contener solo números';
+        else if (value.length < 6) error = 'RU inválido (muy corto)';
+        break;
+      case 'idCard':
+        if (!value) error = 'El CI es obligatorio';
+        else if (!/^\d+$/.test(value)) error = 'Debe contener solo números';
+        else if (value.length < 5) error = 'CI inválido';
+        break;
+      case 'email':
+        if (!value) error = 'El correo es obligatorio';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) error = 'Correo electrónico inválido';
+        break;
+      default:
+        break;
+    }
+    return error;
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    const error = validateField(name, value);
+    setErrors(prev => ({ ...prev, [name]: error }));
   };
+
+  const isStep1Valid = 
+    formData.name && !errors.name &&
+    formData.lastName && !errors.lastName &&
+    formData.regUniv && !errors.regUniv &&
+    formData.idCard && !errors.idCard &&
+    formData.email && !errors.email;
 
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
@@ -77,6 +121,7 @@ const Register: React.FC = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
+                error={errors.name}
                 required
               />
               <Input
@@ -84,6 +129,7 @@ const Register: React.FC = () => {
                 name="lastName"
                 value={formData.lastName}
                 onChange={handleInputChange}
+                error={errors.lastName}
                 required
               />
             </div>
@@ -92,6 +138,7 @@ const Register: React.FC = () => {
               name="regUniv"
               value={formData.regUniv}
               onChange={handleInputChange}
+              error={errors.regUniv}
               required
             />
             <Input
@@ -99,6 +146,7 @@ const Register: React.FC = () => {
               name="idCard"
               value={formData.idCard}
               onChange={handleInputChange}
+              error={errors.idCard}
               required
             />
             <Input
@@ -107,9 +155,10 @@ const Register: React.FC = () => {
               type="email"
               value={formData.email}
               onChange={handleInputChange}
+              error={errors.email}
               required
             />
-            <Button size="full" onClick={nextStep} className="mt-6">
+            <Button size="full" onClick={nextStep} className="mt-6" disabled={!isStep1Valid}>
               Siguiente <ArrowRight size={18} className="ml-2" />
             </Button>
           </motion.div>
