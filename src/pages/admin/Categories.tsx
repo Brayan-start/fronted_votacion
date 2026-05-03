@@ -32,8 +32,8 @@ const Categories: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Categorías</h1>
-          <p className="text-gray-500">Define los cargos o grupos para las votaciones.</p>
+          <h1 className="text-2xl font-bold text-white drop-shadow-sm">Gestión de Categorías</h1>
+          <p className="text-slate-300 font-medium">Define los cargos o grupos para las votaciones.</p>
         </div>
         <Button onClick={() => handleOpenModal()} className="gap-2">
           <Plus size={20} />

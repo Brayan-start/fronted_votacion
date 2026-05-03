@@ -11,8 +11,8 @@ const StudentDashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Bienvenido a VotU</h1>
-        <p className="text-gray-500">Selecciona una elección activa para ejercer tu voto.</p>
+        <h1 className="text-2xl font-bold text-white drop-shadow-sm">Bienvenido a VotU</h1>
+        <p className="text-slate-300 font-medium">Selecciona una elección activa para ejercer tu voto.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

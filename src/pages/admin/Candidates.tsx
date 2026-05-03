@@ -32,8 +32,8 @@ const Candidates: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Candidatos</h1>
-          <p className="text-gray-500">Administra los perfiles de los postulantes.</p>
+          <h1 className="text-2xl font-bold text-white drop-shadow-sm">Gestión de Candidatos</h1>
+          <p className="text-slate-300 font-medium">Administra los perfiles de los postulantes.</p>
         </div>
         <Button onClick={() => handleOpenModal()} className="gap-2">
           <Plus size={20} />

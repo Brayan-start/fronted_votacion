@@ -40,8 +40,8 @@ const AdminDashboard: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard Administrativo</h1>
-          <p className="text-gray-500">Resumen general del sistema de votación.</p>
+          <h1 className="text-2xl font-bold text-white drop-shadow-sm">Dashboard Administrativo</h1>
+          <p className="text-slate-300 font-medium">Resumen general del sistema de votación.</p>
         </div>
       </div>
 

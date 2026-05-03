@@ -38,8 +38,8 @@ const Elections: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Elecciones</h1>
-          <p className="text-gray-500">Crea y administra los procesos electorales.</p>
+          <h1 className="text-2xl font-bold text-white drop-shadow-sm">Gestión de Elecciones</h1>
+          <p className="text-slate-300 font-medium">Crea y administra los procesos electorales.</p>
         </div>
         <Button onClick={() => handleOpenModal()} className="gap-2">
           <Plus size={20} />

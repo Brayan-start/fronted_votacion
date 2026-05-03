@@ -22,8 +22,8 @@ const Students: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Base de Datos de Estudiantes</h1>
-        <p className="text-gray-500">Listado de usuarios habilitados para votar.</p>
+        <h1 className="text-2xl font-bold text-white drop-shadow-sm">Base de Datos de Estudiantes</h1>
+        <p className="text-slate-300 font-medium">Listado de usuarios habilitados para votar.</p>
       </div>
 
       <Card>
