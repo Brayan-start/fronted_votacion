@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { analyticsService } from '../../services/analyticsService';
 import { 
   Users, 
   Vote, 
@@ -14,31 +15,43 @@ import {
   Gavel,
   Stethoscope,
   Calculator,
-  Briefcase
+  Briefcase,
+  Loader2
 } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState([
+    { label: 'Total Estudiantes', value: '0', icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
+    { label: 'Elecciones Activas', value: '0', icon: Vote, color: 'text-green-600', bg: 'bg-green-100' },
+    { label: 'Votos Emitidos', value: '0', icon: CheckCircle, color: 'text-amber-600', bg: 'bg-amber-100' },
+    { label: 'Participación', value: '0%', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-100' },
+  ]);
 
-  const stats = [
-    { label: 'Total Votantes UPEA', value: '45,234', icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
-    { label: 'Elecciones Activas', value: '3', icon: Vote, color: 'text-green-600', bg: 'bg-green-100' },
-    { label: 'Votos Emitidos', value: '12,856', icon: CheckCircle, color: 'text-amber-600', bg: 'bg-amber-100' },
-    { label: 'Participación', value: '68%', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-100' },
-  ];
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await analyticsService.getGlobalStats();
+        setStats([
+          { label: 'Total Estudiantes', value: data.total_voters.toLocaleString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
+          { label: 'Elecciones Activas', value: data.active_elections.toString(), icon: Vote, color: 'text-green-600', bg: 'bg-green-100' },
+          { label: 'Votos Emitidos', value: data.total_votes_cast.toLocaleString(), icon: CheckCircle, color: 'text-amber-600', bg: 'bg-amber-100' },
+          { label: 'Participación', value: `${data.participation_rate}%`, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-100' },
+        ]);
+      } catch (err) {
+        console.error("Error fetching admin stats", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
 
   const categories = [
-    { title: 'Elecciones de Rectorado', count: '1 Elección', icon: GraduationCap, color: 'bg-indigo-500' },
-    { title: 'Consejo Estudiantil', count: '5 Carreras', icon: Vote, color: 'bg-rose-500' },
-    { title: 'Representantes de Carrera', count: '12 Carreras', icon: Users, color: 'bg-emerald-500' },
-  ];
-
-  const faculties = [
-    { name: 'Ingeniería de Sistemas', count: 1200, icon: GraduationCap },
-    { name: 'Derecho', count: 1500, icon: Gavel },
-    { name: 'Medicina', count: 900, icon: Stethoscope },
-    { name: 'Contaduría Pública', count: 1100, icon: Calculator },
-    { name: 'Administración de Empresas', count: 850, icon: Briefcase },
+    { title: 'Elecciones de Rectorado', count: '1 Elección', icon: GraduationCap, color: 'bg-indigo-500', path: '/admin/elections' },
+    { title: 'Consejo Estudiantil', count: '5 Carreras', icon: Vote, color: 'bg-rose-500', path: '/admin/categories' },
+    { title: 'Representantes de Carrera', count: '12 Carreras', icon: Users, color: 'bg-emerald-500', path: '/admin/candidates' },
   ];
 
   return (
@@ -84,7 +97,7 @@ const AdminDashboard: React.FC = () => {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {categories.map((cat, i) => (
-              <div key={i} className="group cursor-pointer">
+              <div key={i} className="group cursor-pointer" onClick={() => navigate(cat.path)}>
                 <div className="bg-white rounded-3xl p-6 shadow-lg border border-transparent hover:border-blue-500 transition-all">
                   <div className={`w-12 h-12 ${cat.color} rounded-2xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform`}>
                     <cat.icon size={24} />
@@ -99,34 +112,21 @@ const AdminDashboard: React.FC = () => {
             ))}
           </div>
 
-          <Card className="!p-0 overflow-hidden">
-            <div className="p-6 border-b flex justify-between items-center">
-              <h3 className="font-bold text-lg">Participación por Carrera</h3>
-              <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">Actualizado hace 2 min</span>
-            </div>
-            <div className="divide-y">
-              {faculties.map((fac, i) => (
-                <div key={i} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-600">
-                      <fac.icon size={20} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900">{fac.name}</p>
-                      <div className="w-48 h-2 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-500 rounded-full" 
-                          style={{ width: `${(fac.count / 1500) * 100}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-black text-gray-900">{fac.count}</p>
-                    <p className="text-xs text-gray-500 font-bold uppercase tracking-tighter">Votos</p>
-                  </div>
+          <Card className="bg-blue-600 text-white p-8 rounded-[2.5rem] border-none shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+            <div className="relative z-10">
+              <h3 className="text-2xl font-black mb-2">Panel de Control de Integridad</h3>
+              <p className="text-blue-100 mb-6 max-w-lg">El sistema está monitoreando activamente la red de votación. Todos los procesos biométricos y registros de sufragio están siendo encriptados en tiempo real.</p>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full border border-white/10 text-xs font-bold uppercase tracking-widest">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  Biometría Activa
                 </div>
-              ))}
+                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full border border-white/10 text-xs font-bold uppercase tracking-widest">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                  Nodos Sincronizados
+                </div>
+              </div>
             </div>
           </Card>
         </div>
@@ -139,13 +139,14 @@ const AdminDashboard: React.FC = () => {
           </h2>
           <div className="space-y-3">
             {[
-              { label: 'Nueva Elección', desc: 'Crear proceso electoral', color: 'bg-blue-600' },
-              { label: 'Cargar Padrón', desc: 'Importar lista Excel/CSV', color: 'bg-indigo-600' },
-              { label: 'Generar Reporte', desc: 'PDF de resultados finales', color: 'bg-slate-800' },
-              { label: 'Auditoría', desc: 'Ver logs del sistema', color: 'bg-amber-600' },
+              { label: 'Nueva Elección', desc: 'Crear proceso electoral', color: 'bg-blue-600', path: '/admin/elections' },
+              { label: 'Cargar Padrón', desc: 'Importar lista Excel/CSV', color: 'bg-indigo-600', path: '/admin/students' },
+              { label: 'Generar Reporte', desc: 'PDF de resultados finales', color: 'bg-slate-800', path: '/admin/results' },
+              { label: 'Auditoría', desc: 'Ver logs del sistema', color: 'bg-amber-600', path: '/admin/dashboard' },
             ].map((action, i) => (
               <button 
                 key={i}
+                onClick={() => navigate(action.path)}
                 className="w-full text-left bg-white p-4 rounded-2xl shadow-md border border-slate-100 hover:border-blue-500 hover:-translate-y-1 transition-all group"
               >
                 <div className="flex items-center justify-between">

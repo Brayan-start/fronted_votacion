@@ -1,73 +1,78 @@
-# React + TypeScript + Vite
+# UPEA Vota - Sistema de Votación Universitaria
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Este es un sistema completo de votación electrónica diseñado para la Universidad Pública de El Alto (UPEA), que incluye registro de estudiantes, validación biométrica facial y un panel administrativo para gestión y resultados en tiempo real.
 
-Currently, two official plugins are available:
+## 🚀 Tecnologías
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### Frontend
+*   **React 19** + **TypeScript**
+*   **Vite** (Build tool)
+*   **TailwindCSS** (Estilos)
+*   **Framer Motion** (Animaciones)
+*   **Lucide React** (Iconografía)
+*   **Recharts** (Gráficos estadísticos)
+*   **Axios** (Peticiones HTTP)
 
-## React Compiler
+### Backend
+*   **Python 3.10+**
+*   **FastAPI** (Framework web)
+*   **Supabase** (Base de datos PostgreSQL + Auth + Storage)
+*   **face_recognition / dlib** (Motor biométrico optimizado para bajos recursos)
+*   **Pydantic** (Validación de datos)
+*   **JOSE / JWT** (Seguridad de tokens)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🛠️ Configuración Inicial
 
-## Expanding the ESLint configuration
+### 1. Supabase (DB & Storage)
+1.  Crea un proyecto en [Supabase](https://supabase.com/).
+2.  Ejecuta el contenido de `supabase_schema.sql` en el SQL Editor para crear las tablas, índices y vistas.
+3.  Crea dos buckets públicos en la sección **Storage**:
+    *   `photos-estudiantes`
+    *   `photos-candidatos`
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 2. Backend (FastAPI)
+1.  Navega a la carpeta del backend.
+2.  Crea un entorno virtual: `python -m venv venv` y actívalo.
+3.  Instala dependencias: `pip install -r requirements.txt`.
+4.  Crea un archivo `.env` basado en el siguiente ejemplo:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+SUPABASE_URL=https://tu-proyecto.supabase.co
+SUPABASE_KEY=tu-anon-key
+SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key
+JWT_SECRET=una-clave-secreta-larga-y-segura
+FACE_MATCH_THRESHOLD=0.55
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+5.  Inicia el servidor: `uvicorn app.main:app --reload`
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 3. Frontend (React)
+1.  Navega a la carpeta raíz del proyecto.
+2.  Instala dependencias: `npm install`.
+3.  Configura el archivo `.env`:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_API_URL=http://localhost:8000/api/v1
 ```
+
+4.  Inicia el modo desarrollo: `npm run dev`
+
+## 📦 Despliegue
+
+### Backend (Render)
+*   **Build Command**: `pip install -r requirements.txt`
+*   **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+*   **Nota**: El motor biométrico está optimizado para funcionar en el plan gratuito de 512MB RAM de Render mediante *Lazy Loading*.
+
+### Frontend (Netlify / Vercel)
+*   **Build Command**: `npm run build`
+*   **Publish Directory**: `dist`
+
+## 🔒 Seguridad y Privacidad
+*   **Anonimato**: Los votos se registran sin relación directa con la identidad en las consultas de resultados (vía agregaciones SQL).
+*   **Anti-Fraude**: Restricciones de unicidad `(user_id, election_id, category_id)` en la base de datos para prevenir doble voto.
+*   **Biometría**: Comparación 1:1 obligatoria antes de emitir cada sufragio.
+
+## 👤 Autor
+Proyecto desarrollado para la carrera de Ingeniería de Sistemas - UPEA.
+© 2026 UPEA Vota.

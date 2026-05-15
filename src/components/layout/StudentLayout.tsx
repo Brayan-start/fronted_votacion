@@ -32,11 +32,11 @@ const StudentLayout: React.FC = () => {
 
           <div className="flex items-center gap-6">
             <div className="hidden sm:flex flex-col items-end">
-              <span className="text-sm font-bold text-slate-900">{user?.name} {user?.lastName}</span>
-              <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">{user?.regUniv}</span>
+              <span className="text-sm font-bold text-slate-900">{user?.name} {user?.last_name}</span>
+              <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">{user?.reg_univ}</span>
             </div>
             <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-md border-2 border-white">
-              {user?.name[0]}{user?.lastName[0]}
+              {user?.name[0]}{user?.last_name[0]}
             </div>
             <button 
               onClick={handleLogout}

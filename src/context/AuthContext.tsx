@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Role } from '../types';
+import { User } from '../types';
 
 interface AuthContextType {
   user: User | null;
@@ -20,7 +20,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Error parsing stored user", e);
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        setToken(null);
+      }
     }
     setLoading(false);
   }, [token]);

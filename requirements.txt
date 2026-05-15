@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+supabase
+python-dotenv
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+pydantic[email]
+pydantic-settings
+numpy
+opencv-python-headless
+face_recognition
+Pillow
+# dlib se instalará automáticamente como dependencia de face_recognition

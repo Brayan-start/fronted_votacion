@@ -1,50 +1,77 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { ConfirmModal } from '../../components/ui/ConfirmModal';
-import { mockElections } from '../../services/mockData';
-import { Plus, Edit, Trash2, Search, Filter, CheckCircle2 } from 'lucide-react';
+import { electionService } from '../../services/electionService';
+import { Plus, Edit, Trash2, Search, Filter, CheckCircle2, AlertCircle, RefreshCcw } from 'lucide-react';
 import { Election } from '../../types';
 
 const Elections: React.FC = () => {
-  const [elections, setElections] = useState<Election[]>(mockElections);
+  const [elections, setElections] = useState<Election[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentElection, setCurrentElection] = useState<Partial<Election> | null>(null);
   const [electionToDelete, setElectionToDelete] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const fetchElections = async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    setError(null);
+    try {
+      const data = await electionService.getAll();
+      setElections(data);
+    } catch (err: any) {
+      console.error(err);
+      setError('Error al cargar elecciones');
+    } finally {
+      if (!quiet) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchElections();
+  }, []);
 
   const handleOpenModal = (election?: Election) => {
     setCurrentElection(election || { 
       title: '', 
       description: '', 
-      startDate: '', 
-      endDate: '', 
-      status: 'inactive',
-      type: 'rectorado'
+      start_date: '', 
+      end_date: '', 
+      status: 'inactive' as any,
+      type: 'rectorado' as any
     });
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
-    if (!currentElection?.title || !currentElection?.startDate || !currentElection?.endDate) return;
+  const handleSave = async () => {
+    if (!currentElection?.title || !currentElection?.start_date || !currentElection?.end_date) return;
 
-    if (currentElection.id) {
-      setElections(elections.map(e => e.id === currentElection.id ? currentElection as Election : e));
-    } else {
-      const newElection: Election = {
-        ...currentElection as Election,
-        id: Math.random().toString(36).substr(2, 9),
-      };
-      setElections([...elections, newElection]);
+    setIsSaving(true);
+    try {
+      if (currentElection.id) {
+        await electionService.update(currentElection.id, currentElection);
+      } else {
+        await electionService.create(currentElection);
+      }
+      
+      setIsModalOpen(false);
+      // Actualizamos primero el estado para feedback inmediato
+      await fetchElections(true);
+      
+      setIsSuccessModalOpen(true);
+      setTimeout(() => setIsSuccessModalOpen(false), 2000);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Error al guardar elección');
+    } finally {
+      setIsSaving(false);
     }
-    
-    setIsModalOpen(false);
-    setIsSuccessModalOpen(true);
-    setTimeout(() => setIsSuccessModalOpen(false), 2000);
   };
 
   const handleDeleteClick = (id: string) => {
@@ -52,11 +79,16 @@ const Elections: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (electionToDelete) {
-      setElections(elections.filter(e => e.id !== electionToDelete));
-      setIsDeleteModalOpen(false);
-      setElectionToDelete(null);
+      try {
+        await electionService.delete(electionToDelete);
+        setElections(elections.filter(e => e.id !== electionToDelete));
+        setIsDeleteModalOpen(false);
+        setElectionToDelete(null);
+      } catch (err: any) {
+        alert('Error al eliminar elección');
+      }
     }
   };
 
@@ -98,67 +130,87 @@ const Elections: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" className="gap-2">
-            <Filter size={18} />
-            Filtros
+          <Button variant="outline" className="gap-2" onClick={() => fetchElections()}>
+            <RefreshCcw size={18} />
+            Actualizar
           </Button>
         </div>
 
         <div className="overflow-x-auto -mx-6 sm:mx-0">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 text-gray-500 text-sm uppercase">
-                <th className="px-6 py-3 font-semibold">Título / Tipo</th>
-                <th className="px-6 py-3 font-semibold">Estado</th>
-                <th className="px-6 py-3 font-semibold">Periodo</th>
-                <th className="px-6 py-3 font-semibold text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredElections.map((election) => (
-                <tr key={election.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-gray-900">{election.title}</p>
-                    <span className="text-[10px] uppercase font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">
-                      {getElectionTypeLabel(election.type)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                      election.status === 'active' ? 'bg-green-100 text-green-700' : 
-                      election.status === 'closed' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {election.status === 'active' ? 'Activa' : election.status === 'closed' ? 'Cerrada' : 'Inactiva'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    <div className="flex flex-col">
-                      <span>Desde: {new Date(election.startDate).toLocaleDateString()}</span>
-                      <span>Hasta: {new Date(election.endDate).toLocaleDateString()}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button 
-                        onClick={() => handleOpenModal(election)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        title="Editar"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteClick(election.id)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title="Eliminar"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+          {loading ? (
+            <div className="space-y-4 p-6">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-16 bg-gray-100 animate-pulse rounded-lg"></div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          ) : error ? (
+            <div className="p-10 text-center">
+              <AlertCircle className="mx-auto text-red-500 mb-2" size={32} />
+              <p className="text-gray-500 font-medium">{error}</p>
+            </div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 text-gray-500 text-sm uppercase">
+                  <th className="px-6 py-3 font-semibold">Título / Tipo</th>
+                  <th className="px-6 py-3 font-semibold">Estado</th>
+                  <th className="px-6 py-3 font-semibold">Periodo</th>
+                  <th className="px-6 py-3 font-semibold text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredElections.map((election) => (
+                  <tr key={election.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-gray-900">{election.title}</p>
+                      <span className="text-[10px] uppercase font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">
+                        {getElectionTypeLabel(election.type)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                        election.status === 'active' ? 'bg-green-100 text-green-700' : 
+                        election.status === 'closed' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {election.status === 'active' ? 'Activa' : election.status === 'closed' ? 'Cerrada' : 'Inactiva'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      <div className="flex flex-col">
+                        <span>Desde: {new Date(election.start_date).toLocaleDateString()}</span>
+                        <span>Hasta: {new Date(election.end_date).toLocaleDateString()}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => handleOpenModal(election)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Editar"
+                        >
+                          <Edit size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteClick(election.id)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Eliminar"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredElections.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-10 text-center text-gray-500">
+                      No se encontraron elecciones.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </Card>
 
@@ -169,8 +221,8 @@ const Elections: React.FC = () => {
         title={currentElection?.id ? 'Editar Elección' : 'Nueva Elección Universitaria'}
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">Guardar Cambios</Button>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSaving}>Cancelar</Button>
+            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700" loading={isSaving}>Guardar Cambios</Button>
           </>
         }
       >
@@ -222,14 +274,18 @@ const Elections: React.FC = () => {
             <Input 
               label="Fecha Inicio" 
               type="date" 
-              value={currentElection?.startDate} 
-              onChange={(e) => setCurrentElection({...currentElection, startDate: e.target.value})}
+              value={currentElection?.start_date && !isNaN(new Date(currentElection.start_date).getTime()) 
+                ? new Date(currentElection.start_date).toISOString().split('T')[0] 
+                : ''} 
+              onChange={(e) => setCurrentElection({...currentElection, start_date: e.target.value})}
             />
             <Input 
               label="Fecha Fin" 
               type="date" 
-              value={currentElection?.endDate} 
-              onChange={(e) => setCurrentElection({...currentElection, endDate: e.target.value})}
+              value={currentElection?.end_date && !isNaN(new Date(currentElection.end_date).getTime()) 
+                ? new Date(currentElection.end_date).toISOString().split('T')[0] 
+                : ''} 
+              onChange={(e) => setCurrentElection({...currentElection, end_date: e.target.value})}
             />
           </div>
         </div>

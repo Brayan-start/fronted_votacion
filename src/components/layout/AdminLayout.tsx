@@ -93,10 +93,10 @@ const AdminLayout: React.FC = () => {
           <div className="p-6 border-t border-slate-100/50">
             <div className="bg-slate-50/50 rounded-2xl p-4 mb-4 flex items-center gap-3 border border-slate-100">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-md">
-                {user?.name[0]}{user?.lastName[0]}
+                {user?.name[0]}{user?.last_name[0]}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-slate-900 truncate">{user?.name} {user?.lastName}</p>
+                <p className="text-sm font-bold text-slate-900 truncate">{user?.name} {user?.last_name}</p>
                 <p className="text-xs text-slate-500 font-medium truncate uppercase tracking-wider">{user?.role}</p>
               </div>
             </div>
