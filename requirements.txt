@@ -49,3 +49,4 @@ dlib-bin==19.24.6
 numpy==2.2.2
 opencv-python-headless==4.11.0.86
 face-recognition-models==0.3.0
+requests
