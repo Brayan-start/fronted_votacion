@@ -27,7 +27,11 @@ class DlibBiometricProvider(BiometricProvider):
         return padded
 
     def _try_encoding(self, image: np.ndarray, label: str) -> List[float]:
-        encodings = face_recognition.face_encodings(image, model="hog")
+        face_locs = face_recognition.face_locations(image, model="hog")
+        logger.info(f"[{label}] face_locations encontradas: {len(face_locs)}")
+        if not face_locs:
+            return []
+        encodings = face_recognition.face_encodings(image, known_face_locations=face_locs, model="hog")
         if encodings:
             logger.info(f"Rostro detectado con {label}")
             return encodings[0].tolist()
@@ -37,6 +41,7 @@ class DlibBiometricProvider(BiometricProvider):
         self._ensure_model_ready()
         try:
             pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            logger.info(f"Imagen recibida: tamaño={pil_img.size}, modo={pil_img.mode}, bytes={len(image_bytes)}")
 
             # Redimensionar si supera 800px de ancho
             if pil_img.width > 800:
@@ -66,6 +71,7 @@ class DlibBiometricProvider(BiometricProvider):
                 face_locs = face_recognition.face_locations(
                     eq_rgb, number_of_times_to_upsample=1, model="hog"
                 )
+                logger.info(f"[ecualización + upsampling] face_locations encontradas: {len(face_locs)}")
                 if face_locs:
                     encodings = face_recognition.face_encodings(
                         eq_rgb, known_face_locations=face_locs, num_upsampling=1
