@@ -1,10 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from app.models.schemas import VoteCreate, VoteResponse, UserResponse
+import hashlib
+import random
+from datetime import datetime
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from app.models.schemas import VoteCreate, VoteResponse, UserResponse, VoteHistoryItem, CarnetData, CarnetVerificationResponse
 from app.db.supabase import supabase, supabase_admin
 from app.routers.deps import get_current_user
 from app.services.biometric import biometric_service
 from app.utils.image import process_base64_image
 from app.core.config import settings
+from app.utils.audit import log_audit, get_client_ip
 import logging
 
 router = APIRouter()
@@ -105,13 +111,13 @@ async def verify_identity(
 
 @router.post("/", response_model=VoteResponse)
 async def cast_vote(
-    vote_in: VoteCreate, 
+    vote_in: VoteCreate,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
     user_id = current_user.id
+    client_ip = get_client_ip(request)
     
-    # 1. Validaciones Previas
-    # 1.1 Ya votó?
     existing_vote = supabase_admin.table("votes").select("id").match({
         "user_id": user_id,
         "election_id": vote_in.election_id,
@@ -120,19 +126,24 @@ async def cast_vote(
     
     if existing_vote.data:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Ya has emitido tu voto para esta categoría en esta elección"
         )
 
-    # 1.2 Elección activa?
     election = supabase_admin.table("elections").select("status").eq("id", vote_in.election_id).single().execute()
     if not election.data or election.data["status"] != "active":
+        await log_audit(
+            usuario=f"{current_user.name} {current_user.last_name} ({current_user.reg_univ})",
+            rol="student",
+            accion="Emisión de voto",
+            detalle=f"Intento de voto en elección inactiva: {vote_in.election_id}",
+            ip=client_ip,
+            resultado="error",
+        )
         raise HTTPException(status_code=400, detail="La elección no está activa")
 
-    # 2. Verificación Biométrica (Re-validamos por seguridad en el commit final)
     await _perform_biometric_check(user_id, vote_in.face_capture_base64)
 
-    # 3. Registro de Voto Atómico
     vote_data = {
         "user_id": user_id,
         "election_id": vote_in.election_id,
@@ -143,7 +154,149 @@ async def cast_vote(
     response = supabase_admin.table("votes").insert(vote_data).execute()
     
     if not response.data:
+        await log_audit(
+            usuario=f"{current_user.name} {current_user.last_name} ({current_user.reg_univ})",
+            rol="student",
+            accion="Emisión de voto",
+            detalle="Error al registrar voto en base de datos",
+            ip=client_ip,
+            resultado="error",
+        )
         raise HTTPException(status_code=500, detail="No se pudo registrar el voto. Intenta nuevamente.")
     
     logger.info(f"Voto exitoso registrado: Usuario {user_id} - Elección {vote_in.election_id}")
+    await log_audit(
+        usuario=f"{current_user.name} {current_user.last_name} ({current_user.reg_univ})",
+        rol="student",
+        accion="Emisión de voto",
+        detalle=f"Elección: {vote_in.election_id}",
+        ip=client_ip,
+        resultado="exito",
+    )
     return response.data[0]
+
+# ──────────────────────────────────────────────────────────────────────
+# HISTORIAL PERSONAL DE VOTACIÓN
+# ──────────────────────────────────────────────────────────────────────
+
+@router.get("/history", response_model=List[VoteHistoryItem])
+async def get_vote_history(current_user: UserResponse = Depends(get_current_user)):
+    """
+    Retorna el historial completo de votos del usuario autenticado,
+    con detalles de la elección, categoría y candidato seleccionado.
+    """
+    user_id = current_user.id
+    votes_resp = (
+        supabase_admin.table("votes")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    if not votes_resp.data:
+        return []
+
+    history = []
+    for v in votes_resp.data:
+        # Obtener nombre de la elección
+        election = supabase_admin.table("elections").select("title, type").eq("id", v["election_id"]).single().execute()
+        election_title = election.data["title"] if election.data else "Desconocida"
+        election_type = election.data["type"] if election.data else ""
+
+        # Obtener nombre de la categoría
+        category = supabase_admin.table("categories").select("name").eq("id", v["category_id"]).single().execute()
+        category_name = category.data["name"] if category.data else "Desconocida"
+
+        # Obtener nombre del candidato
+        candidate = supabase_admin.table("candidates").select("name").eq("id", v["candidate_id"]).single().execute()
+        candidate_name = candidate.data["name"] if candidate.data else "Desconocido"
+
+        history.append(VoteHistoryItem(
+            id=v["id"],
+            election_title=election_title,
+            election_type=election_type,
+            category_name=category_name,
+            candidate_name=candidate_name,
+            created_at=v["created_at"],
+        ))
+
+    return history
+
+# ──────────────────────────────────────────────────────────────────────
+# CARNET DE SUFRAGIO — datos para generar el PDF en el frontend
+# ──────────────────────────────────────────────────────────────────────
+
+# ──────────────────────────────────────────────────────────────────────
+# VERIFICACIÓN PÚBLICA DE CARNET (sin autenticación)
+# ──────────────────────────────────────────────────────────────────────
+
+@router.get("/verify-carnet", response_model=CarnetVerificationResponse)
+async def verify_carnet(code: str):
+    """Verifica públicamente un código de carnet de sufragio."""
+    if not code or len(code) < 10:
+        return CarnetVerificationResponse(
+            valido=False,
+            mensaje="Código de verificación inválido."
+        )
+
+    # Buscar el código en todos los perfiles
+    profiles = supabase_admin.table("profiles").select("*").execute()
+    for profile in profiles.data or []:
+        raw = f"{profile['reg_univ']}|{profile['id_card']}|{str(datetime.utcnow().year)}|{profile['id']}"
+        codigo = hashlib.sha256(raw.encode()).hexdigest()[:16].upper()
+        if codigo == code:
+            mesa_hash = hashlib.md5(profile["reg_univ"].encode()).hexdigest()[:4]
+            mesa_num = str(int(mesa_hash, 16) % 100).zfill(2)
+            return CarnetVerificationResponse(
+                valido=True,
+                nombre=f"{profile['name']} {profile['last_name']}",
+                ru=profile["reg_univ"],
+                mesa=mesa_num,
+                gestion=str(datetime.utcnow().year),
+                mensaje="Carnet válido. El documento corresponde a un estudiante registrado."
+            )
+
+    return CarnetVerificationResponse(
+        valido=False,
+        mensaje="Código no encontrado o carnet no válido."
+    )
+
+@router.get("/carnet", response_model=CarnetData)
+async def get_carnet_data(current_user: UserResponse = Depends(get_current_user)):
+    """
+    Retorna los datos necesarios para generar el Carnet de Sufragio PDF
+    del usuario autenticado.
+
+    El carnet incluye: nombre, CI, RU, número de mesa (asignado en base
+    al RU), gestión electoral, fecha de emisión y un código único de
+    verificación generado a partir de los datos del usuario.
+    """
+    user = current_user
+
+    # Generar número de mesa basado en hash del RU (consistente siempre)
+    mesa_hash = hashlib.md5(user.reg_univ.encode()).hexdigest()[:4]
+    mesa_num = str(int(mesa_hash, 16) % 100).zfill(2)
+
+    # Gestión electoral = año actual
+    gestion = str(datetime.utcnow().year)
+
+    # Fecha de emisión
+    fecha_emision = datetime.utcnow().strftime("%d/%m/%Y")
+
+    # Código único de verificación (hash de datos del usuario)
+    raw = f"{user.reg_univ}|{user.id_card}|{gestion}|{user.id}"
+    codigo = hashlib.sha256(raw.encode()).hexdigest()[:16].upper()
+
+    return CarnetData(
+        name=user.name,
+        last_name=user.last_name,
+        id_card=user.id_card,
+        reg_univ=user.reg_univ,
+        email=user.email,
+        carrera=user.career,
+        mesa=mesa_num,
+        gestion=gestion,
+        fecha_emision=fecha_emision,
+        codigo_verificacion=codigo,
+        photo_url=user.photo_url,
+    )

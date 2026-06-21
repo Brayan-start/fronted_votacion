@@ -1,0 +1,77 @@
+# Render Blueprint — Configuración de infraestructura como código
+# Plataforma: https://render.com
+# Documentación: https://render.com/docs/blueprint-spec
+
+services:
+  # ── Backend API (FastAPI) ──────────────────────────────────────────────
+  - type: web
+    name: upea-vota-api
+    runtime: python
+    region: saopaulo
+    plan: free
+    branch: main
+    healthCheckPath: /
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --forwarded-allow-ips '*'
+    envVarGroups:
+      - upea-vota-production
+
+  # ── Frontend (React + Vite) ────────────────────────────────────────────
+  # NOTA: El frontend se despliega mejor en Vercel (ver README2.md).
+  # Esta configuración es para Render Static Site si prefieres todo en un solo lugar.
+  # - type: static
+  #   name: upea-vota-frontend
+  #   runtime: static
+  #   region: saopaulo
+  #   branch: main
+  #   buildCommand: npm install && npm run build
+  #   staticPublishPath: dist
+  #   envVars:
+  #     - key: VITE_API_URL
+  #       fromService:
+  #         name: upea-vota-api
+  #         type: web
+  #         property: url
+  #     - key: VITE_RECAPTCHA_SITE_KEY
+  #       sync: false
+
+envVarGroups:
+  - name: upea-vota-production
+    envVars:
+      # ── Supabase ──────────────────────────────────────────────────────
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # ── JWT ───────────────────────────────────────────────────────────
+      - key: JWT_SECRET
+        sync: false
+
+      # ── CORS ──────────────────────────────────────────────────────────
+      - key: CORS_ORIGINS
+        sync: false
+
+      # ── reCAPTCHA ─────────────────────────────────────────────────────
+      - key: RECAPTCHA_SECRET_KEY
+        sync: false
+      - key: RECAPTCHA_SKIP_VERIFICATION
+        value: "false"
+
+      # ── Biometría ─────────────────────────────────────────────────────
+      - key: FACE_MATCH_THRESHOLD
+        value: "0.55"
+
+      # ── SMTP (opcional) ──────────────────────────────────────────────
+      - key: SMTP_SERVER
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false

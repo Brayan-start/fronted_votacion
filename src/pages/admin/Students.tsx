@@ -2,20 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ConfirmModal } from '../../components/ui/ConfirmModal';
-import { Modal } from '../../components/ui/Modal';
+import { useToast } from '../../context/ToastContext';
 import { authService } from '../../services/authService';
 import { User } from '../../types';
-import { Search, UserMinus, UserCheck, Shield, CheckCircle2, Loader2, AlertCircle, RefreshCcw } from 'lucide-react';
+import { Search, UserMinus, Loader2, AlertCircle, RefreshCcw } from 'lucide-react';
 
 const Students: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [students, setStudents] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const fetchStudents = async () => {
     setLoading(true);
@@ -23,16 +22,14 @@ const Students: React.FC = () => {
     try {
       const data = await authService.getAllStudents();
       setStudents(data);
-    } catch (err) {
+    } catch {
       setError("No se pudieron cargar los estudiantes.");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchStudents();
-  }, []);
+  useEffect(() => { fetchStudents(); }, []);
 
   const handleDeleteClick = (id: string) => {
     setStudentToDelete(id);
@@ -43,14 +40,12 @@ const Students: React.FC = () => {
     if (studentToDelete) {
       try {
         await authService.deleteStudent(studentToDelete);
-        // Actualizamos el estado local eliminando el estudiante
         setStudents(prev => prev.filter(s => s.id !== studentToDelete));
+        showToast('success', 'Eliminación exitosa', 'El estudiante ha sido removido del sistema.');
         setIsDeleteModalOpen(false);
         setStudentToDelete(null);
-        setIsSuccessModalOpen(true);
-        setTimeout(() => setIsSuccessModalOpen(false), 2000);
-      } catch (err) {
-        alert("Error al eliminar estudiante");
+      } catch {
+        showToast('error', 'Error al eliminar', 'No se pudo eliminar el estudiante.');
       }
     }
   };
@@ -66,22 +61,22 @@ const Students: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-white drop-shadow-sm">Base de Datos de Estudiantes UPEA</h1>
-          <p className="text-slate-300 font-medium">Listado oficial de universitarios habilitados para el sufragio.</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Base de Datos de Estudiantes</h1>
+          <p className="text-[var(--text-secondary)] font-medium">Listado oficial de universitarios habilitados para el sufragio.</p>
         </div>
-        <Button variant="outline" className="bg-white/10 border-white/20 text-white" onClick={fetchStudents}>
-          <RefreshCcw size={18} className="mr-2" /> Actualizar
+        <Button variant="outline" className="gap-2" onClick={fetchStudents}>
+          <RefreshCcw size={18} /> Actualizar
         </Button>
       </div>
 
       <Card>
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
             <input 
               type="text" 
               placeholder="Buscar por nombre, registro o cédula..." 
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200"
+              className="w-full pl-10 pr-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -91,39 +86,41 @@ const Students: React.FC = () => {
         <div className="overflow-x-auto -mx-6 sm:mx-0">
           {loading ? (
             <div className="flex justify-center py-20">
-              <Loader2 className="animate-spin text-blue-600" size={40} />
+              <Loader2 className="animate-spin text-blue-400" size={40} />
             </div>
           ) : error ? (
             <div className="text-center py-20">
-              <AlertCircle className="text-red-500 mx-auto mb-2" size={32} />
-              <p className="text-gray-500 font-medium">{error}</p>
+              <AlertCircle className="text-red-400 mx-auto mb-2" size={32} />
+              <p className="text-[var(--text-secondary)] font-medium">{error}</p>
             </div>
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50 text-gray-500 text-sm uppercase">
-                  <th className="px-6 py-3 font-semibold">Estudiante</th>
-                  <th className="px-6 py-3 font-semibold">Registro</th>
-                  <th className="px-6 py-3 font-semibold">Cédula</th>
-                  <th className="px-6 py-3 font-semibold text-right">Acciones</th>
+                <tr className="text-[var(--text-tertiary)] text-sm uppercase border-b border-[var(--border-color)]">
+                  <th className="px-6 py-4 font-semibold">Estudiante</th>
+                  <th className="px-6 py-4 font-semibold">Registro</th>
+                  <th className="px-6 py-4 font-semibold">Cédula</th>
+                  <th className="px-6 py-4 font-semibold text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[var(--border-color)]">
                 {filteredStudents.length > 0 ? (
                   filteredStudents.map((student) => (
-                    <tr key={student.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
-                          {student.name[0]}{student.last_name[0]}
+                    <tr key={student.id} className="hover:bg-[var(--bg-tertiary)]/30 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs">
+                            {student.name[0]}{student.last_name[0]}
+                          </div>
+                          <span className="font-medium text-[var(--text-primary)]">{student.name} {student.last_name}</span>
                         </div>
-                        <span className="font-medium text-gray-900">{student.name} {student.last_name}</span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{student.reg_univ}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{student.id_card}</td>
+                      <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{student.reg_univ}</td>
+                      <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{student.id_card}</td>
                       <td className="px-6 py-4 text-right">
                         <button 
                           onClick={() => handleDeleteClick(student.id)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                           title="Eliminar Estudiante"
                         >
                           <UserMinus size={18} />
@@ -133,7 +130,7 @@ const Students: React.FC = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="px-6 py-10 text-center text-gray-500">
+                    <td colSpan={4} className="px-6 py-10 text-center text-[var(--text-tertiary)]">
                       No se encontraron estudiantes que coincidan con la búsqueda.
                     </td>
                   </tr>
@@ -149,24 +146,10 @@ const Students: React.FC = () => {
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleConfirmDelete}
         title="Eliminar Estudiante"
-        message="¿Estás seguro de que deseas eliminar a este estudiante? Esta acción revocará su acceso al sistema de votación de la UPEA."
+        message="¿Estás seguro de que deseas eliminar a este estudiante? Esta acción revocará su acceso al sistema de votación."
         confirmText="Eliminar permanentemente"
         variant="danger"
       />
-
-      <Modal
-        isOpen={isSuccessModalOpen}
-        onClose={() => setIsSuccessModalOpen(false)}
-        title=""
-      >
-        <div className="flex flex-col items-center justify-center py-6 text-center">
-          <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
-            <CheckCircle2 size={40} />
-          </div>
-          <h3 className="text-xl font-bold text-gray-900">¡Acción Completada!</h3>
-          <p className="text-gray-500 mt-2">El estudiante ha sido removido de la base de datos satisfactoriamente.</p>
-        </div>
-      </Modal>
     </div>
   );
 };

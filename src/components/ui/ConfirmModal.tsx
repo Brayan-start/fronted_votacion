@@ -33,7 +33,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       title={title}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={loading}>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
             {cancelText}
           </Button>
           <Button variant={variant} onClick={onConfirm} loading={loading}>
@@ -43,11 +43,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       }
     >
       <div className="flex items-start gap-4">
-        <div className={`p-3 rounded-full flex-shrink-0 ${variant === 'danger' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+        <div className={`p-3 rounded-full flex-shrink-0 ${variant === 'danger' ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'}`}>
           <AlertTriangle size={24} />
         </div>
         <div>
-          <p className="text-gray-600 leading-relaxed">
+          <p className="text-[var(--text-secondary)] leading-relaxed">
             {message}
           </p>
         </div>

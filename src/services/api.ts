@@ -9,38 +9,32 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  console.log(`[API] Request: ${config.method?.toUpperCase()} ${config.url}`);
   return config;
 });
 
 api.interceptors.response.use(
-  (response) => {
-    console.log(`[API] Response: ${response.status} from ${response.config.url}`);
-    return response;
-  },
+  (response) => response,
   (error) => {
     const status = error.response?.status;
     const detail = error.response?.data?.detail || '';
+    const detailStr = typeof detail === 'string' ? detail : '';
     const isBiometricError = 
-      detail.toLowerCase().includes('facial') || 
-      detail.toLowerCase().includes('rostro') || 
-      detail.toLowerCase().includes('biometría');
+      detailStr.toLowerCase().includes('facial') || 
+      detailStr.toLowerCase().includes('rostro') || 
+      detailStr.toLowerCase().includes('biometría') ||
+      detailStr.toLowerCase().includes('identidad') ||
+      detailStr.toLowerCase().includes('coincide');
+
+    if (status === 401 && isBiometricError) {
+      return Promise.reject(error);
+    }
 
     if (status === 401) {
-      if (isBiometricError) {
-        console.warn(`[BIOMETRIC ERROR] 401 at ${error.config?.url}: ${detail}`);
-        // No redirigimos ni borramos token para errores biométricos
-        return Promise.reject(error);
-      } else {
-        console.error(`[AUTH ERROR] 401 Unauthorized at ${error.config?.url}. Redirecting to login.`);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
-    } else {
-      console.error(`[API ERROR] ${status} from ${error.config?.url}`, error.response?.data);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     }
-    
+
     return Promise.reject(error);
   }
 );

@@ -1,0 +1,149 @@
+================================================================================
+SISTEMA ONLINE DE ELECCIONES ELECTORALES CON INTELIGENCIA ARTIFICIAL PARA 
+AUTENTICACIÓN FACIAL
+================================================================================
+
+1. INTRODUCCIÓN DEL PROYECTO
+--------------------------------------------------------------------------------
+
+El presente proyecto surge como una respuesta tecnológica avanzada a la necesidad 
+de modernizar y asegurar la integridad de los procesos democráticos en entornos 
+institucionales. El "Sistema Online de Elecciones Electorales" propone un cambio 
+de paradigma, transitando del sufragio tradicional basado en papel hacia un 
+entorno digital robusto y transparente.
+
+EL PROBLEMA QUE RESUELVE:
+Históricamente, los procesos electorales presenciales han enfrentado desafíos 
+críticos como la suplantación de identidad, el alto costo logístico, el error 
+humano en el conteo de votos y la baja participación debido a barreras 
+geográficas. Este sistema elimina estas vulnerabilidades mediante la 
+automatización y la verificación de identidad en tiempo real.
+
+IMPORTANCIA DE LA VOTACIÓN DIGITAL:
+La digitalización electoral no solo agiliza la obtención de resultados, sino que 
+democratiza el acceso al voto, permitiendo que el elector participe desde 
+cualquier ubicación con acceso a internet, garantizando al mismo tiempo que el 
+conteo sea inalterable y auditable.
+
+USO DE INTELIGENCIA ARTIFICIAL Y RECONOCIMIENTO FACIAL:
+La pieza central de este sistema es la integración de modelos de Deep Learning 
+para la biometría facial. A diferencia de las contraseñas tradicionales, los 
+rasgos biofaciales son intransferibles. El sistema utiliza redes neuronales 
+para generar descriptores vectoriales de 128 dimensiones, permitiendo comparar 
+el rostro capturado en el momento del voto con el registro oficial, asegurando 
+que quien ejerce el derecho sea efectivamente el titular de la cuenta.
+
+BENEFICIOS DEL SISTEMA:
+- Seguridad Inquebrantable: Autenticación multifactorial (Credenciales + Biometría).
+- Transparencia Total: Resultados procesados por algoritmos sin intervención humana.
+- Eficiencia Operativa: Reducción drástica en tiempos de escrutinio y logística.
+- Accesibilidad: Interfaz responsiva diseñada para diversos dispositivos.
+
+
+2. RIESGOS DEL PROYECTO
+--------------------------------------------------------------------------------
+
+A. RIESGOS TÉCNICOS
+- Descripción: Fallos en la integración entre el frontend (React) y la API 
+  de IA (FastAPI).
+- Impacto: Alto (Interrupción del servicio de votación).
+- Probabilidad: Media.
+- Mitigación: Implementación de pruebas unitarias y de integración, junto 
+  con un sistema de logs en tiempo real.
+
+B. RIESGOS DE SEGURIDAD
+- Descripción: Intentos de inyección SQL o ataques de fuerza bruta al API.
+- Impacto: Crítico (Compromiso de la base de datos).
+- Probabilidad: Baja.
+- Mitigación: Uso de Row Level Security (RLS) en Supabase, validación de 
+  esquemas con Pydantic y cifrado JWT.
+
+C. RIESGOS OPERATIVOS
+- Descripción: Dificultad del usuario para realizar la captura facial debido 
+  a mala iluminación o hardware deficiente.
+- Impacto: Medio (Frustración del elector y posible abstención).
+- Probabilidad: Alta.
+- Mitigación: Guías visuales de usuario en la interfaz y feedback inmediato 
+  sobre la calidad de la imagen capturada.
+
+D. RIESGOS BIOMÉTRICOS/FACIALES
+- Descripción: Falsos positivos (permitir voto a quien no es) o falsos 
+  negativos (rechazar al usuario legítimo).
+- Impacto: Crítico (Pérdida de confianza en el sistema).
+- Probabilidad: Muy Baja.
+- Mitigación: Calibración estricta del umbral de distancia euclidiana (threshold) 
+  del modelo de reconocimiento facial.
+
+E. RIESGOS DE INFRAESTRUCTURA Y BASE DE DATOS
+- Descripción: Caída de los servicios de Supabase o saturación del servidor API.
+- Impacto: Alto (Imposibilidad de emitir votos).
+- Probabilidad: Baja.
+- Mitigación: Uso de infraestructura escalable en la nube y redundancia de datos.
+
+
+3. KPIs DEL SISTEMA (KEY PERFORMANCE INDICATORS)
+--------------------------------------------------------------------------------
+
+A. KPI DE RENDIMIENTO (TIEMPO DE CARGA)
+- Qué mide: El tiempo promedio que tarda la aplicación en estar lista para el uso.
+- Cómo se calcula: (Tiempo total de carga de activos / Número de sesiones).
+- Importancia: Crucial para evitar el abandono del usuario antes de votar.
+
+B. KPI DE AUTENTICACIÓN FACIAL (TASA DE ÉXITO)
+- Qué mide: Porcentaje de verificaciones biométricas exitosas al primer intento.
+- Cómo se calcula: (Verificaciones exitosas / Total de intentos de verificación) * 100.
+- Importancia: Indica la precisión y facilidad de uso del motor de IA.
+
+C. KPI DE DISPONIBILIDAD (UPTIME)
+- Qué mide: El tiempo que el sistema permanece online sin interrupciones.
+- Cómo se calcula: (Tiempo operativo / Tiempo total esperado) * 100.
+- Importancia: Garantiza que la jornada electoral no se detenga.
+
+D. KPI DE SEGURIDAD (INTENTOS DE ACCESO FALLIDOS)
+- Qué mide: Volumen de peticiones rechazadas por credenciales o biometría errónea.
+- Cómo se calcula: Sumatoria de errores 401 y 403 reportados por el backend.
+- Importancia: Permite detectar posibles ataques coordinados.
+
+E. KPI DE USO DEL SISTEMA (TASA DE PARTICIPACIÓN)
+- Qué mide: El nivel de compromiso de los electores registrados.
+- Cómo se calcula: (Votos emitidos / Usuarios registrados en el padrón) * 100.
+- Importancia: Mide el éxito democrático de la implementación tecnológica.
+
+
+4. MÉTRICAS DEL SISTEMA
+--------------------------------------------------------------------------------
+
+A. TIEMPO DE RESPUESTA
+- Cómo se mide: Latencia desde que se envía la imagen hasta que el API 
+  devuelve el resultado.
+- Valores recomendados: < 2.5 segundos.
+- Importancia: Un proceso lento genera incertidumbre en el votante.
+
+B. PRECISIÓN BIOMÉTRICA (THRESHOLD)
+- Cómo se mide: Distancia euclidiana entre el embedding almacenado y el capturado.
+- Valores recomendados: Umbral de 0.6 (para modelos de dlib).
+- Importancia: Define el equilibrio entre seguridad y usabilidad.
+
+C. USUARIOS CONCURRENTES
+- Cómo se mide: Número de sockets activos o sesiones simultáneas en el servidor.
+- Valores recomendados: Soportar al menos el 20% de la población electoral en hora pico.
+- Importancia: Evita el colapso del sistema durante los cierres de mesa.
+
+D. VOTOS PROCESADOS
+- Cómo se mide: Contador total de registros insertados en la tabla 'votes'.
+- Valores recomendados: Debe coincidir exactamente con el total de participaciones.
+- Importancia: Es la métrica final de integridad del proceso.
+
+E. TASA DE ERRORES
+- Cómo se mide: Frecuencia de excepciones HTTP 500 registradas en el servidor.
+- Valores recomendados: < 1%.
+- Importancia: Refleja la estabilidad del código fuente.
+
+F. DISPONIBILIDAD DEL SISTEMA
+- Cómo se mide: Monitorización externa mediante "pings" de estado al endpoint raíz.
+- Valores recomendados: 99.9% (High Availability).
+- Importancia: Es el pilar de la confianza institucional en el sistema.
+
+================================================================================
+FIN DE LA DOCUMENTACIÓN
+================================================================================

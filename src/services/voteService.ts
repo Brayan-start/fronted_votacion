@@ -1,5 +1,5 @@
 import api from './api';
-import { VoteCreate, VoteResponse } from '../types';
+import { VoteCreate, VoteResponse, VoteHistoryItem, CarnetData } from '../types';
 
 export const voteService = {
   castVote: async (data: VoteCreate): Promise<VoteResponse> => {
@@ -16,10 +16,26 @@ export const voteService = {
     const response = await api.get('/votes/stats');
     return response.data;
   },
-  
+
   checkStatus: async (electionId: string, categoryId: string) => {
-    // Implementar si existe endpoint de validación previa
-    // Por ahora el backend ya valida en el POST
     return true;
-  }
+  },
+
+  // ── Historial personal de votación ───────────────────────────────────
+  getHistory: async (): Promise<VoteHistoryItem[]> => {
+    const response = await api.get('/votes/history');
+    return response.data;
+  },
+
+  // ── Datos para el carnet de sufragio ─────────────────────────────────
+  getCarnetData: async (): Promise<CarnetData> => {
+    const response = await api.get('/votes/carnet');
+    return response.data;
+  },
+
+  // ── Verificación pública de carnet ──────────────────────────────────
+  verifyCarnet: async (code: string): Promise<any> => {
+    const response = await api.get(`/votes/verify-carnet?code=${encodeURIComponent(code)}`);
+    return response.data;
+  },
 };

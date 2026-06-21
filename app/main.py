@@ -5,7 +5,7 @@ import time
 import logging
 
 from app.core.config import settings
-from app.routers import auth, elections, students, votes, analytics, candidates
+from app.routers import auth, elections, students, votes, analytics, candidates, audit
 
 # Configuración de Logs
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +58,7 @@ app.include_router(students.router, prefix=f"{settings.API_V1_STR}/students", ta
 app.include_router(votes.router, prefix=f"{settings.API_V1_STR}/votes", tags=["Votes"])
 app.include_router(analytics.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics"])
 app.include_router(candidates.router, prefix=f"{settings.API_V1_STR}/candidates", tags=["Candidates"])
+app.include_router(audit.router, prefix=f"{settings.API_V1_STR}/audit", tags=["Audit"])
 
 @app.get("/")
 async def root():
