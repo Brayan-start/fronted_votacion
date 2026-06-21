@@ -113,6 +113,11 @@ export interface ResetPasswordRequest {
   new_password: string;
 }
 
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
 export interface ApiMessageResponse {
   message: string;
 }

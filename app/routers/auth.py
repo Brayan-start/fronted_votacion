@@ -3,14 +3,16 @@ import string
 import hashlib
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.models.schemas import (
     UserCreate, UserResponse, Token, LoginRequest,
     PasswordResetRequest, VerifyResetCodeRequest, ResetPasswordRequest,
+    ChangePasswordRequest,
 )
-from app.db.supabase import supabase_admin
+from app.db.supabase import supabase, supabase_admin
 from app.core.security import create_access_token, get_password_hash
 from app.core.config import settings
+from app.routers.deps import get_current_user
 from app.utils.storage import upload_base64_image
 from app.utils.image import process_base64_image
 from app.utils.recaptcha import verify_recaptcha_token
@@ -322,13 +324,13 @@ async def forgot_password(data: PasswordResetRequest, request: Request):
             usuario=email,
             rol="student",
             accion="Recuperación de contraseña",
-            detalle="Error al enviar correo SMTP",
+            detalle="Error al enviar correo vía Brevo",
             ip=client_ip,
             resultado="error",
         )
         raise HTTPException(
             status_code=500,
-            detail="Error al enviar el correo. Verifica la configuración SMTP o intenta más tarde.",
+            detail="Error al enviar el correo. Verifica la configuración de Brevo o intenta más tarde.",
         )
 
     logger.info("[RESET] Código enviado a %s (expira: %s)", email, expires_at.isoformat())
@@ -450,3 +452,148 @@ async def reset_password(data: ResetPasswordRequest, request: Request):
         resultado="exito",
     )
     return {"message": "Contraseña cambiada exitosamente. Ya puedes iniciar sesión con tu nueva contraseña."}
+
+# ──────────────────────────────────────────────────────────────────────
+# CAMBIO DE CONTRASEÑA DESDE SESIÓN ACTIVA (usuario autenticado)
+# ──────────────────────────────────────────────────────────────────────
+
+@router.post("/change-password", status_code=200)
+async def change_password(
+    data: ChangePasswordRequest,
+    request: Request,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    Cambia la contraseña del usuario autenticado.
+    Requiere la contraseña actual para verificar la identidad.
+    """
+    client_ip = get_client_ip(request)
+    user_id = current_user.id
+    email = current_user.email
+
+    # 1. Verificar la contraseña actual contra Supabase Auth
+    try:
+        sign_in_result = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": data.current_password,
+        })
+        if not sign_in_result or not sign_in_result.user:
+            logger.warning("[CHANGE_PASSWORD] sign_in_with_password no retornó usuario para %s", user_id)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="La contraseña actual es incorrecta.",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("[CHANGE_PASSWORD] Excepción validando contraseña actual para %s: %s", user_id, e)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="La contraseña actual es incorrecta.",
+        )
+
+    # 2. Actualizar la contraseña en Supabase Auth
+    #    (usa el Admin API — modifica auth.users, NO la tabla profiles)
+    try:
+        update_result = supabase_admin.auth.admin.update_user_by_id(
+            user_id,
+            {"password": data.new_password},
+        )
+        logger.info(
+            "[CHANGE_PASSWORD] update_user_by_id respuesta para %s: %s",
+            user_id, update_result,
+        )
+    except Exception as e:
+        logger.error("[CHANGE_PASSWORD] Excepción en update_user_by_id para %s: %s", user_id, e)
+        await log_audit(
+            usuario=f"{current_user.name} {current_user.last_name} ({current_user.reg_univ})",
+            rol=current_user.role,
+            accion="Cambio de contraseña",
+            detalle=f"Error al actualizar en Supabase Auth: {e}",
+            ip=client_ip,
+            resultado="error",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al cambiar la contraseña. Intenta de nuevo.",
+        )
+
+    # 3. Verificar que la nueva contraseña funciona
+    try:
+        supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": data.new_password,
+        })
+        logger.info("[CHANGE_PASSWORD] Nueva contraseña verificada para %s", user_id)
+    except Exception as e:
+        logger.error(
+            "[CHANGE_PASSWORD] La nueva contraseña NO funciona después del update para %s: %s",
+            user_id, e,
+        )
+        await log_audit(
+            usuario=f"{current_user.name} {current_user.last_name} ({current_user.reg_univ})",
+            rol=current_user.role,
+            accion="Cambio de contraseña",
+            detalle="La nueva contraseña no pasó verificación post-actualización",
+            ip=client_ip,
+            resultado="error",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="El cambio de contraseña no pudo ser verificado. Intenta de nuevo.",
+        )
+
+    logger.info("[CHANGE_PASSWORD] Contraseña actualizada exitosamente para usuario %s", user_id)
+    await log_audit(
+        usuario=f"{current_user.name} {current_user.last_name} ({current_user.reg_univ})",
+        rol=current_user.role,
+        accion="Cambio de contraseña",
+        detalle="Contraseña cambiada desde sesión activa",
+        ip=client_ip,
+        resultado="exito",
+    )
+    return {"message": "Contraseña cambiada exitosamente."}
+
+# ──────────────────────────────────────────────────────────────────────
+# CERRAR SESIÓN EN TODOS LOS DISPOSITIVOS
+# ──────────────────────────────────────────────────────────────────────
+
+@router.post("/logout-all", status_code=200)
+async def logout_all(
+    request: Request,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    Invalida todas las sesiones activas del usuario (todos los dispositivos).
+    Los tokens JWT existentes dejarán de funcionar al expirar.
+    """
+    user_id = current_user.id
+    client_ip = get_client_ip(request)
+
+    try:
+        # Invalidar todos los refresh tokens del usuario en Supabase Auth
+        supabase_admin.auth.admin.sign_out(user_id)
+        logger.info("[LOGOUT_ALL] Sesiones invalidadas para usuario %s", user_id)
+    except Exception as e:
+        logger.error("[LOGOUT_ALL] Error al cerrar sesiones para %s: %s", user_id, e)
+        await log_audit(
+            usuario=f"{current_user.name} {current_user.last_name} ({current_user.reg_univ})",
+            rol=current_user.role,
+            accion="Cierre de sesión en todos los dispositivos",
+            detalle="Error al invalidar sesiones",
+            ip=client_ip,
+            resultado="error",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al cerrar sesiones. Intenta de nuevo.",
+        )
+
+    await log_audit(
+        usuario=f"{current_user.name} {current_user.last_name} ({current_user.reg_univ})",
+        rol=current_user.role,
+        accion="Cierre de sesión en todos los dispositivos",
+        ip=client_ip,
+        resultado="exito",
+    )
+    return {"message": "Sesión cerrada en todos los dispositivos correctamente."}

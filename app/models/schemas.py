@@ -163,6 +163,11 @@ class ResetPasswordRequest(BaseModel):
     code: str
     new_password: str = Field(..., min_length=6, description="Nueva contraseña (mínimo 6 caracteres)")
 
+class ChangePasswordRequest(BaseModel):
+    """Cambio de contraseña desde sesión activa (usuario autenticado)."""
+    current_password: str = Field(..., min_length=1, description="Contraseña actual")
+    new_password: str = Field(..., min_length=6, description="Nueva contraseña (mínimo 6 caracteres)")
+
 # --- Vote History ---
 
 class VoteHistoryItem(BaseModel):

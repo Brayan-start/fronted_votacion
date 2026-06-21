@@ -1,16 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
+import Swal from 'sweetalert2';
 import {
   User, Mail, GraduationCap, Hash, Calendar, Camera, CheckCircle2,
-  AlertTriangle, Save,
+  AlertTriangle, Save, LogOut,
 } from 'lucide-react';
 
 const Profile: React.FC = () => {
-  const { user, login } = useAuth();
+  const { user, login, logout } = useAuth();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Estado del formulario de perfil ──────────────────────────────────
@@ -26,6 +29,7 @@ const Profile: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
 
   // Sincronizar si el usuario cambia externamente
   useEffect(() => {
@@ -105,6 +109,53 @@ const Profile: React.FC = () => {
   };
 
   const triggerFileInput = () => fileInputRef.current?.click();
+
+  // ── Cerrar sesión en todos los dispositivos ───────────────────────────
+  const handleLogoutAll = async () => {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: '¿Cerrar sesión en todos los dispositivos?',
+      text: 'Se cerrará tu sesión en este dispositivo y en todos los demás donde tengas sesión activa. Deberás iniciar sesión nuevamente.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cerrar todo',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      background: '#1a1d29',
+      color: '#f1f5f9',
+      reverseButtons: true,
+    });
+
+    if (!result.isConfirmed) return;
+
+    setLoggingOutAll(true);
+    try {
+      await authService.logoutAll();
+      await Swal.fire({
+        icon: 'success',
+        title: 'Sesiones cerradas',
+        text: 'Se cerró tu sesión en todos los dispositivos.',
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+        background: '#1a1d29',
+        color: '#f1f5f9',
+      });
+      logout();
+      navigate('/login');
+    } catch {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'No se pudieron cerrar todas las sesiones. Intenta de nuevo.',
+        confirmButtonColor: '#ef4444',
+        background: '#1a1d29',
+        color: '#f1f5f9',
+      });
+    } finally {
+      setLoggingOutAll(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -317,6 +368,21 @@ const Profile: React.FC = () => {
                 <p className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-1">Rol</p>
                 <p className="text-sm font-bold text-[var(--text-primary)] capitalize">{user?.role === 'student' ? 'Estudiante' : 'Administrador'}</p>
               </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-[var(--border-color)]">
+              <button
+                onClick={handleLogoutAll}
+                disabled={loggingOutAll}
+                className="w-full h-12 rounded-xl border-2 border-red-500/30 bg-red-500/5 text-red-400 font-black text-sm transition-all hover:bg-red-500/15 hover:border-red-500/50 disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2"
+              >
+                {loggingOutAll ? (
+                  <span className="w-5 h-5 rounded-full border-2 border-red-400/40 border-t-red-400 animate-spin" />
+                ) : (
+                  <LogOut size={18} />
+                )}
+                Cerrar sesión en todos los dispositivos
+              </button>
             </div>
           </Card>
         </div>

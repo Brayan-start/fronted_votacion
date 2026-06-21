@@ -39,13 +39,8 @@ class Settings(BaseSettings):
     # En desarrollo, si está vacía se omite la validación para facilitar pruebas
     RECAPTCHA_SKIP_VERIFICATION: bool = os.getenv("RECAPTCHA_SKIP_VERIFICATION", "false").lower() == "true"
 
-    # SMTP (para envío de correos — cambio de contraseña, etc.)
+    # Email (Brevo API — único servicio de correo)
     BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
-    SMTP_SERVER: str = os.getenv("SMTP_SERVER", "")
-    
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USER: str = os.getenv("SMTP_USER", "")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")
 
     # Biometrics

@@ -1,5 +1,5 @@
 import api from './api';
-import { User, LoginRequest, TokenResponse, UpdateProfileRequest, PhotoUploadRequest, ApiMessageResponse } from '../types';
+import { User, LoginRequest, TokenResponse, UpdateProfileRequest, PhotoUploadRequest, ChangePasswordRequest, ApiMessageResponse } from '../types';
 
 export const authService = {
   login: async (data: LoginRequest): Promise<TokenResponse> => {
@@ -52,6 +52,20 @@ export const authService = {
 
   resetPassword: async (email: string, code: string, new_password: string): Promise<ApiMessageResponse> => {
     const response = await api.post('/auth/reset-password', { email, code, new_password });
+    return response.data;
+  },
+
+  // ── Cambio de contraseña desde sesión activa ──────────────────────────
+
+  changePassword: async (data: ChangePasswordRequest): Promise<ApiMessageResponse> => {
+    const response = await api.post('/auth/change-password', data);
+    return response.data;
+  },
+
+  // ── Cerrar sesión en todos los dispositivos ──────────────────────────
+
+  logoutAll: async (): Promise<ApiMessageResponse> => {
+    const response = await api.post('/auth/logout-all');
     return response.data;
   },
 };

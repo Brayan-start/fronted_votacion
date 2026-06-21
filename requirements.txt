@@ -34,6 +34,9 @@ python-multipart==0.0.20
 # Cliente HTTP (reCAPTCHA, descarga de imágenes)
 httpx==0.28.1
 
+# Correo electrónico — Brevo API (oficial)
+brevo-python==1.0.0
+
 # Procesamiento de imágenes
 Pillow==11.1.0
 
