@@ -1,3 +1,4 @@
+import cv2
 import face_recognition
 import numpy as np
 import io
@@ -56,7 +57,26 @@ class DlibBiometricProvider(BiometricProvider):
             if result:
                 return result
 
-            logger.warning("No se detectó rostro en la imagen (intentado con y sin padding)")
+            # 3er intento: ecualización de histograma + upsampling
+            try:
+                gray = cv2.cvtColor(raw_np, cv2.COLOR_RGB2GRAY)
+                eq_gray = cv2.equalizeHist(gray)
+                eq_rgb = cv2.cvtColor(eq_gray, cv2.COLOR_GRAY2RGB)
+
+                face_locs = face_recognition.face_locations(
+                    eq_rgb, number_of_times_to_upsample=1, model="hog"
+                )
+                if face_locs:
+                    encodings = face_recognition.face_encodings(
+                        eq_rgb, known_face_locations=face_locs, num_upsampling=1
+                    )
+                    if encodings:
+                        logger.info("Rostro detectado con ecualización + upsampling")
+                        return encodings[0].tolist()
+            except Exception as e2:
+                logger.warning(f"Intento con ecualización falló: {e2}")
+
+            logger.warning("No se detectó rostro en la imagen (3 intentos agotados)")
             return []
 
         except Exception as e:

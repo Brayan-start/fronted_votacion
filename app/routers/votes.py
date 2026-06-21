@@ -42,7 +42,7 @@ async def _perform_biometric_check(user_id: str, face_capture_base64: str):
                         "embedding": stored_embedding
                     }).execute()
                 else:
-                    raise HTTPException(status_code=400, detail="No se pudo procesar la foto de registro para biometría")
+                    raise HTTPException(status_code=503, detail="No se pudo procesar la foto biométrica. Intente registrarse nuevamente.")
             except Exception as ex:
                 logger.error(f"Error descargando/procesando foto de perfil: {ex}")
                 raise HTTPException(status_code=400, detail="Error al recuperar foto de registro")
