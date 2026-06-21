@@ -23,8 +23,16 @@ class Settings(BaseSettings):
 
     # CORS
     # Convert string like "http://localhost:5173,https://site.com" to list
-    _cors_origins: str = os.getenv("CORS_ORIGINS", "*")
-    CORS_ORIGINS: List[str] = _cors_origins.split(",")
+    # CORS
+    # NOTA: se lee como str (no List[str]) porque pydantic-settings intenta
+    # parsear los campos List[...] como JSON desde la variable de entorno,
+    # y un valor separado por comas como "http://a.com,http://b.com" no es
+    # JSON válido. Por eso se convierte a lista en una @property.
+    CORS_ORIGINS_RAW: str = os.getenv("CORS_ORIGINS", "*")
+
+    @property
+    def CORS_ORIGINS(self) -> List[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS_RAW.split(",") if origin.strip()]
 
     # Google reCAPTCHA
     RECAPTCHA_SECRET_KEY: str = os.getenv("RECAPTCHA_SECRET_KEY", "")
