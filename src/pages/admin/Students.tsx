@@ -5,7 +5,7 @@ import { ConfirmModal } from '../../components/ui/ConfirmModal';
 import { useToast } from '../../context/ToastContext';
 import { authService } from '../../services/authService';
 import { User } from '../../types';
-import { Search, UserMinus, Loader2, AlertCircle, RefreshCcw } from 'lucide-react';
+import { Search, UserMinus, Loader2, AlertCircle, RefreshCcw, ShieldCheck, ShieldX } from 'lucide-react';
 
 const Students: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,6 +100,7 @@ const Students: React.FC = () => {
                   <th className="px-6 py-4 font-semibold">Estudiante</th>
                   <th className="px-6 py-4 font-semibold">Registro</th>
                   <th className="px-6 py-4 font-semibold">Cédula</th>
+                  <th className="px-6 py-4 font-semibold text-center">Contraseña</th>
                   <th className="px-6 py-4 font-semibold text-right">Acciones</th>
                 </tr>
               </thead>
@@ -117,6 +118,19 @@ const Students: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{student.reg_univ}</td>
                       <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{student.id_card}</td>
+                      <td className="px-6 py-4 text-center">
+                        {student.password_changed ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                            <ShieldCheck size={15} />
+                            Cambiada
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--text-tertiary)]">
+                            <ShieldX size={15} />
+                            Original (CI)
+                          </span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <button 
                           onClick={() => handleDeleteClick(student.id)}
@@ -130,7 +144,7 @@ const Students: React.FC = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="px-6 py-10 text-center text-[var(--text-tertiary)]">
+                    <td colSpan={5} className="px-6 py-10 text-center text-[var(--text-tertiary)]">
                       No se encontraron estudiantes que coincidan con la búsqueda.
                     </td>
                   </tr>

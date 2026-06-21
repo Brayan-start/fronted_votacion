@@ -192,18 +192,39 @@ async def login(login_data: LoginRequest, request: Request):
     profile = user_query.data[0]
     user_id = profile["id"]
 
-    # 2. Validar CI localmente.
-    if str(profile.get("id_card", "")).strip() != str(login_data.id_card).strip():
-        logger.warning(f"CI incorrecto para RU: {login_data.reg_univ}")
+    # 2. Validar contraseña contra Supabase Auth.
+    #    El campo id_card del request contiene la contraseña
+    #    (inicialmente igual al CI, luego la que el usuario haya definido).
+    email = profile.get("email", "")
+    try:
+        sign_in_result = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": login_data.id_card,
+        })
+        if not sign_in_result or not sign_in_result.user:
+            logger.warning(f"Password incorrecto para RU: {login_data.reg_univ} (email: {email})")
+            await log_audit(
+                usuario=login_data.reg_univ,
+                rol=profile.get("role", "student"),
+                accion="Inicio de sesión fallido",
+                detalle="Contraseña incorrecta",
+                ip=client_ip,
+                resultado="error",
+            )
+            raise HTTPException(status_code=401, detail="Credenciales incorrectas.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error en sign_in_with_password para RU {login_data.reg_univ}: {e}")
         await log_audit(
             usuario=login_data.reg_univ,
             rol=profile.get("role", "student"),
             accion="Inicio de sesión fallido",
-            detalle="CI incorrecto",
+            detalle=f"Error de autenticación: {e}",
             ip=client_ip,
             resultado="error",
         )
-        raise HTTPException(status_code=401, detail="Cedula de identidad incorrecta")
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas.")
 
     # 3. Generar nuestro propio token para el sistema.
     access_token = create_access_token(subject=user_id)
@@ -425,10 +446,11 @@ async def reset_password(data: ResetPasswordRequest, request: Request):
 
     # Actualizar la contraseña en Supabase Auth usando Admin API
     try:
-        supabase_admin.auth.admin.update_user_by_id(
+        update_result = supabase_admin.auth.admin.update_user_by_id(
             user_id,
             {"password": data.new_password},
         )
+        logger.info("[RESET] update_user_by_id respuesta para %s: %s", user_id, update_result)
     except Exception as e:
         logger.error("[RESET] Error al actualizar contraseña en Auth: %s", e)
         await log_audit(
@@ -440,6 +462,12 @@ async def reset_password(data: ResetPasswordRequest, request: Request):
             resultado="error",
         )
         raise HTTPException(status_code=500, detail="Error al cambiar la contraseña. Intenta de nuevo.")
+
+    # Marcar que el usuario cambió su contraseña
+    try:
+        supabase_admin.table("profiles").update({"password_changed": True}).eq("id", user_id).execute()
+    except Exception as e:
+        logger.warning("[RESET] No se pudo actualizar password_changed para %s: %s", user_id, e)
 
     del _reset_codes[email_key]
 
@@ -518,7 +546,13 @@ async def change_password(
             detail="Error al cambiar la contraseña. Intenta de nuevo.",
         )
 
-    # 3. Verificar que la nueva contraseña funciona
+    # 3. Marcar que el usuario cambió su contraseña
+    try:
+        supabase_admin.table("profiles").update({"password_changed": True}).eq("id", user_id).execute()
+    except Exception as e:
+        logger.warning("[CHANGE_PASSWORD] No se pudo actualizar password_changed para %s: %s", user_id, e)
+
+    # 4. Verificar que la nueva contraseña funciona
     try:
         supabase.auth.sign_in_with_password({
             "email": email,

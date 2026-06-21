@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('admin', 'student')),
   career TEXT,
   photo_url TEXT,
+  password_changed BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

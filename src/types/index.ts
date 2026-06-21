@@ -10,6 +10,7 @@ export interface User {
   role: Role;
   photo_url?: string;
   career?: string;
+  password_changed?: boolean;
   created_at?: string;
 }
 

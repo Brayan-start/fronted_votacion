@@ -41,6 +41,7 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     id: str
     photo_url: Optional[str] = None
+    password_changed: Optional[bool] = False
     created_at: datetime
 
     class Config:
