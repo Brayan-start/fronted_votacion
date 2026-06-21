@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   career TEXT,
   photo_url TEXT,
   password_changed BOOLEAN NOT NULL DEFAULT FALSE,
+  session_token UUID NOT NULL DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -202,6 +203,7 @@ ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
 
 -- Migración: agregar columna password_changed a perfiles existentes
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS password_changed BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS session_token UUID NOT NULL DEFAULT gen_random_uuid();
 
 -- Para crear un admin despues de registrar un usuario:
 -- UPDATE public.profiles SET role = 'admin' WHERE reg_univ = 'TU_RU';

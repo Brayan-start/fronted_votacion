@@ -1,6 +1,7 @@
 import random
 import string
 import hashlib
+import uuid
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -227,7 +228,8 @@ async def login(login_data: LoginRequest, request: Request):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas.")
 
     # 3. Generar nuestro propio token para el sistema.
-    access_token = create_access_token(subject=user_id)
+    session_token = profile.get("session_token")
+    access_token = create_access_token(subject=user_id, session_token=session_token)
     
     logger.info(f"Login exitoso: {login_data.reg_univ} (ID: {user_id})")
     await log_audit(
@@ -599,28 +601,64 @@ async def logout_all(
 ):
     """
     Invalida todas las sesiones activas del usuario (todos los dispositivos).
-    Los tokens JWT existentes dejarán de funcionar al expirar.
+
+    Estrategia (3 capas de fallback):
+      1. Llamar a la API Admin de Supabase Auth (sign_out).
+      2. Si falla, eliminar directamente los registros de auth.sessions.
+      3. Siempre regenera session_token en profiles, invalidando
+         cualquier JWT existente (verificado en get_current_user).
     """
     user_id = current_user.id
     client_ip = get_client_ip(request)
+    supabase_ok = False
 
+    # ── Capa 1: Supabase Auth Admin API ──────────────────────────────
     try:
-        # Invalidar todos los refresh tokens del usuario en Supabase Auth
-        supabase_admin.auth.admin.sign_out(user_id)
-        logger.info("[LOGOUT_ALL] Sesiones invalidadas para usuario %s", user_id)
+        # En supabase-py v2 el método es sign_out(user_id, scope="global")
+        if hasattr(supabase_admin.auth, 'admin') and hasattr(supabase_admin.auth.admin, 'sign_out'):
+            try:
+                supabase_admin.auth.admin.sign_out(user_id, scope="global")
+                supabase_ok = True
+                logger.info("[LOGOUT_ALL] sign_out(scope=global) OK para %s", user_id)
+            except TypeError:
+                # Firmas antiguas: solo user_id
+                supabase_admin.auth.admin.sign_out(user_id)
+                supabase_ok = True
+                logger.info("[LOGOUT_ALL] sign_out(user_id) OK para %s", user_id)
+        else:
+            logger.warning("[LOGOUT_ALL] sign_out no disponible en esta versión de supabase-py")
     except Exception as e:
-        logger.error("[LOGOUT_ALL] Error al cerrar sesiones para %s: %s", user_id, e)
+        logger.error("[LOGOUT_ALL] Error en sign_out para %s: %s", user_id, e, exc_info=True)
+
+    # ── Capa 2: Eliminar sesiones directamente desde auth.sessions ────
+    if not supabase_ok:
+        try:
+            result = supabase_admin.table("sessions").delete().eq("user_id", user_id).execute()
+            logger.info("[LOGOUT_ALL] Eliminación directa de sessions para %s: %s", user_id, result)
+            supabase_ok = True
+        except Exception as e:
+            logger.error("[LOGOUT_ALL] Error al eliminar sessions para %s: %s", user_id, e, exc_info=True)
+
+    # ── Capa 3 (siempre): regenerar session_token en profiles ─────────
+    try:
+        new_token = str(uuid.uuid4())
+        supabase_admin.table("profiles").update(
+            {"session_token": new_token}
+        ).eq("id", user_id).execute()
+        logger.info("[LOGOUT_ALL] session_token regenerado para %s → %s", user_id, new_token)
+    except Exception as e:
+        logger.error("[LOGOUT_ALL] Error al regenerar session_token para %s: %s", user_id, e, exc_info=True)
         await log_audit(
             usuario=f"{current_user.name} {current_user.last_name} ({current_user.reg_univ})",
             rol=current_user.role,
             accion="Cierre de sesión en todos los dispositivos",
-            detalle="Error al invalidar sesiones",
+            detalle=f"Error crítico al regenerar session_token: {e}",
             ip=client_ip,
             resultado="error",
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al cerrar sesiones. Intenta de nuevo.",
+            detail="No se pudieron cerrar todas las sesiones, intenta de nuevo.",
         )
 
     await log_audit(
