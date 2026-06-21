@@ -8,7 +8,7 @@ import { authService } from '../../services/authService';
 import Swal from 'sweetalert2';
 import {
   User, Mail, GraduationCap, Hash, Calendar, Camera, CheckCircle2,
-  AlertTriangle, Save, LogOut,
+  AlertTriangle, Save, LogOut, ShieldCheck, ShieldX, Lock,
 } from 'lucide-react';
 
 const Profile: React.FC = () => {
@@ -294,6 +294,52 @@ const Profile: React.FC = () => {
                 </label>
                 <div className="w-full h-12 rounded-xl border-2 border-[var(--border-color)] bg-[var(--bg-tertiary)]/50 px-4 flex items-center text-base font-bold text-[var(--text-secondary)]">
                   {user?.reg_univ}
+                </div>
+                <p className="text-[10px] text-[var(--text-tertiary)] font-medium mt-1.5 ml-1">
+                  Permanente, no se puede modificar.
+                </p>
+              </div>
+
+              {/* CI (solo lectura) */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-2">
+                  <Hash size={14} className="inline mr-1" />
+                  Cédula de Identidad
+                </label>
+                <div className="w-full h-12 rounded-xl border-2 border-[var(--border-color)] bg-[var(--bg-tertiary)]/50 px-4 flex items-center text-base font-bold text-[var(--text-secondary)]">
+                  {user?.id_card}
+                </div>
+                <p className="text-[10px] text-[var(--text-tertiary)] font-medium mt-1.5 ml-1">
+                  Permanente, no se puede modificar.
+                </p>
+              </div>
+
+              {/* Contraseña */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-2">
+                  <Lock size={14} className="inline mr-1" />
+                  Contraseña
+                </label>
+                <div className="w-full rounded-xl border-2 border-[var(--border-color)] bg-[var(--bg-tertiary)]/50 px-4 py-3 flex items-center justify-between">
+                  <span className="text-base font-bold text-[var(--text-secondary)]">
+                    {user?.password_changed ? (
+                      <span className="inline-flex items-center gap-1.5 text-emerald-400">
+                        <ShieldCheck size={16} />
+                        Personalizada
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-[var(--text-tertiary)]">
+                        <ShieldX size={16} />
+                        CI original
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    onClick={() => navigate('/student/change-password')}
+                    className="text-xs font-black text-blue-400 hover:text-blue-300 uppercase tracking-wider transition-colors"
+                  >
+                    Cambiar
+                  </button>
                 </div>
               </div>
 

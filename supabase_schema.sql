@@ -200,5 +200,8 @@ VALUES
   ('candidates', 'candidates', true)
 ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
 
+-- Migración: agregar columna password_changed a perfiles existentes
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS password_changed BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Para crear un admin despues de registrar un usuario:
 -- UPDATE public.profiles SET role = 'admin' WHERE reg_univ = 'TU_RU';
