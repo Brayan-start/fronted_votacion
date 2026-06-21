@@ -32,20 +32,20 @@ async def _perform_biometric_check(user_id: str, face_capture_base64: str):
         stored_emb_res = supabase_admin.table("face_embeddings").select("embedding").eq("user_id", user_id).execute()
         
         if not stored_emb_res.data:
-            logger.info(f"Embedding no encontrado para usuario {user_id}. Intentando generar desde foto de perfil.")
-            try:
-                photo_bytes = requests.get(profile.data["photo_url"]).content
-                stored_embedding = biometric_service.get_embedding(photo_bytes)
-                if stored_embedding:
-                    supabase_admin.table("face_embeddings").upsert({
-                        "user_id": user_id,
-                        "embedding": stored_embedding
-                    }).execute()
-                else:
-                    raise HTTPException(status_code=503, detail="No se pudo procesar la foto biométrica. Intente registrarse nuevamente.")
-            except Exception as ex:
-                logger.error(f"Error descargando/procesando foto de perfil: {ex}")
-                raise HTTPException(status_code=400, detail="Error al recuperar foto de registro")
+            logger.info(f"Embedding no encontrado para usuario {user_id}. Usando captura actual como referencia.")
+            current_capture_bytes = process_base64_image(face_capture_base64)
+            stored_embedding = biometric_service.get_embedding(current_capture_bytes)
+            if not stored_embedding:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se detectó rostro en la cámara. Asegúrate de tener buena iluminación."
+                )
+            supabase_admin.table("face_embeddings").upsert({
+                "user_id": user_id,
+                "embedding": stored_embedding
+            }).execute()
+            logger.info(f"PRIMERA VERIFICACIÓN: Embedding creado desde captura para usuario {user_id}")
+            return True
         else:
             stored_embedding = stored_emb_res.data[0]["embedding"]
 
