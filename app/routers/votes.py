@@ -3,6 +3,8 @@ import random
 from datetime import datetime
 from typing import List
 
+import requests
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from app.models.schemas import VoteCreate, VoteResponse, UserResponse, VoteHistoryItem, CarnetData, CarnetVerificationResponse
 from app.db.supabase import supabase, supabase_admin
@@ -31,7 +33,6 @@ async def _perform_biometric_check(user_id: str, face_capture_base64: str):
         
         if not stored_emb_res.data:
             logger.info(f"Embedding no encontrado para usuario {user_id}. Intentando generar desde foto de perfil.")
-            import requests
             try:
                 photo_bytes = requests.get(profile.data["photo_url"]).content
                 stored_embedding = biometric_service.get_embedding(photo_bytes)

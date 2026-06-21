@@ -3,6 +3,7 @@ import numpy as np
 import io
 import logging
 from typing import List
+from PIL import Image, ImageOps
 from app.services.biometric.base import BiometricProvider
 
 logger = logging.getLogger(__name__)
@@ -10,24 +11,54 @@ logger = logging.getLogger(__name__)
 class DlibBiometricProvider(BiometricProvider):
     def __init__(self):
         self._model_loaded = False
-        # No cargamos nada en el init para Lazy Loading real
 
     def _ensure_model_ready(self):
         if not self._model_loaded:
             logger.info("Lazy Loading: dlib/face_recognition models ready for use.")
             self._model_loaded = True
 
+    def _add_top_padding(self, img: Image.Image, padding_ratio: float = 0.2) -> Image.Image:
+        w, h = img.size
+        pad_h = int(h * padding_ratio)
+        new_h = h + pad_h
+        padded = Image.new("RGB", (w, new_h), (128, 128, 128))
+        padded.paste(img, (0, pad_h))
+        return padded
+
+    def _try_encoding(self, image: np.ndarray, label: str) -> List[float]:
+        encodings = face_recognition.face_encodings(image, model="hog")
+        if encodings:
+            logger.info(f"Rostro detectado con {label}")
+            return encodings[0].tolist()
+        return []
+
     def get_embedding(self, image_bytes: bytes) -> List[float]:
         self._ensure_model_ready()
         try:
-            image = face_recognition.load_image_file(io.BytesIO(image_bytes))
-            # Usamos model="hog" para ser más livianos en CPU/RAM
-            encodings = face_recognition.face_encodings(image, model="hog")
-            
-            if not encodings:
-                return []
-            
-            return encodings[0].tolist()
+            pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+            # Redimensionar si supera 800px de ancho
+            if pil_img.width > 800:
+                ratio = 800.0 / pil_img.width
+                new_h = int(pil_img.height * ratio)
+                pil_img = pil_img.resize((800, new_h), Image.Resampling.LANCZOS)
+
+            # 1er intento: con padding superior 20%
+            padded = self._add_top_padding(pil_img, 0.2)
+            padded_np = np.array(padded)
+            result = self._try_encoding(padded_np, "HOG + padding superior")
+            if result:
+                return result
+
+            # 2do intento: sin padding
+            raw_np = np.array(pil_img)
+            result = self._try_encoding(raw_np, "HOG sin padding")
+            if result:
+                return result
+
+            logger.warning("No se detectó rostro en la imagen (intentado con y sin padding)")
+            return []
+
         except Exception as e:
             logger.error(f"Error extrayendo embedding: {e}")
             return []
