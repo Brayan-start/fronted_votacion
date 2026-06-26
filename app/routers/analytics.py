@@ -4,11 +4,20 @@ from app.db.supabase import supabase_admin
 from app.routers.deps import get_current_user
 from app.models.analytics import ElectionAnalytics, CategoryResult, CandidateResult, GlobalStats
 from app.models.schemas import UserResponse
+from app.services.election_service import update_expired_elections
 
 router = APIRouter()
 
+
+async def refresh_election_statuses():
+    """Dependency que actualiza elecciones vencidas antes de cada request."""
+    try:
+        update_expired_elections()
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Error refreshing election statuses: {e}")
+
 @router.get("/global-stats", response_model=GlobalStats)
-async def get_global_stats(current_user: UserResponse = Depends(get_current_user)):
+async def get_global_stats(current_user: UserResponse = Depends(get_current_user), _=Depends(refresh_election_statuses)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
 
@@ -30,7 +39,8 @@ async def get_global_stats(current_user: UserResponse = Depends(get_current_user
 @router.get("/{election_id}", response_model=ElectionAnalytics)
 async def get_election_analytics(
     election_id: str, 
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(get_current_user),
+    _=Depends(refresh_election_statuses),
 ):
     # Validar rol admin
     if current_user.role != "admin":

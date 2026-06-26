@@ -4,9 +4,18 @@ import logging
 from app.models.schemas import ElectionResponse, CategoryResponse, CandidateResponse, ElectionCreate, CategoryCreate, UserResponse
 from app.db.supabase import supabase, supabase_admin
 from app.routers.deps import get_current_user
+from app.services.election_service import update_expired_elections
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+async def refresh_election_statuses():
+    """Dependency que actualiza elecciones vencidas antes de cada request."""
+    try:
+        update_expired_elections()
+    except Exception as e:
+        logger.error(f"Error refreshing election statuses: {e}")
 
 # --- Categories (Move more specific routes UP) ---
 
@@ -23,7 +32,7 @@ async def get_category_candidates(category_id: str):
 # --- Elections ---
 
 @router.get("/", response_model=List[ElectionResponse])
-async def get_elections():
+async def get_elections(_=Depends(refresh_election_statuses)):
     response = supabase_admin.table("elections").select("*").order("created_at", desc=True).execute()
     return response.data
 
@@ -40,8 +49,16 @@ async def create_election(election_in: ElectionCreate, current_user: UserRespons
 
     return response.data[0]
 
+@router.post("/check-expired")
+async def check_expired_elections(current_user: UserResponse = Depends(get_current_user)):
+    """Endpoint manual para forzar el cierre de elecciones vencidas. Solo ADMIN."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    count = update_expired_elections()
+    return {"message": f"Se cerraron {count} elección(es) vencida(s)", "updated": count}
+
 @router.get("/{election_id}", response_model=ElectionResponse)
-async def get_election(election_id: str):
+async def get_election(election_id: str, _=Depends(refresh_election_statuses)):
     logger.info(f"[DEV] Buscando elección ID: {election_id}")
     try:
         response = supabase_admin.table("elections").select("*").eq("id", election_id).execute()

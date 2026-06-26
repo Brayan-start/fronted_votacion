@@ -232,3 +232,8 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL 
 
 -- Para crear un admin despues de registrar un usuario:
 -- UPDATE public.profiles SET role = 'admin' WHERE reg_univ = 'TU_RU';
+
+-- Respaldo: programar tarea automática con pg_cron (si está disponible en tu plan Supabase)
+-- SELECT cron.schedule('close-expired-elections', '* * * * *',
+--   $$UPDATE public.elections SET status = 'closed' WHERE status = 'active' AND end_date < NOW()$$
+-- );

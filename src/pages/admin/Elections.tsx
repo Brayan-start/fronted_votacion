@@ -84,6 +84,13 @@ const Elections: React.FC = () => {
     }
   };
 
+  const getEffectiveStatus = (e: Election): string => {
+    if (e.status !== 'active') return e.status;
+    const now = new Date();
+    const endDate = new Date(e.end_date);
+    return endDate < now ? 'closed' : 'active';
+  };
+
   const filteredElections = elections.filter(e => 
     e.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -160,13 +167,19 @@ const Elections: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-                        election.status === 'active' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 
-                        election.status === 'closed' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 
-                        'bg-gray-500/10 text-gray-400 border border-gray-500/20'
-                      }`}>
-                        {election.status === 'active' ? 'Activa' : election.status === 'closed' ? 'Cerrada' : 'Inactiva'}
-                      </span>
+                      {(() => {
+                        const effStatus = getEffectiveStatus(election);
+                        const isActuallyExpired = election.status === 'active' && effStatus === 'closed';
+                        return (
+                          <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
+                            effStatus === 'active' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 
+                            effStatus === 'closed' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 
+                            'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+                          }`}>
+                            {effStatus === 'active' ? 'Activa' : effStatus === 'closed' ? (isActuallyExpired ? 'Vencida' : 'Cerrada') : 'Inactiva'}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
                       <div className="flex flex-col">
