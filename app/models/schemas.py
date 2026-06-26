@@ -30,7 +30,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
-    photo_base64: Optional[str] = None # For registration
+    photo_base64: str # For registration (obligatorio)
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None

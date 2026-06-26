@@ -50,6 +50,53 @@ else:
 @router.post("/register", response_model=UserResponse)
 async def register(user_in: UserCreate, request: Request):
     client_ip = get_client_ip(request)
+
+    # 0. Validar que la foto facial sea obligatoria
+    if not user_in.photo_base64:
+        raise HTTPException(status_code=422, detail="Debes escanear tu rostro para completar el registro")
+
+    # 0.5 Procesar y validar la imagen facial ANTES de crear el usuario
+    try:
+        image_bytes = process_base64_image(user_in.photo_base64)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    import face_recognition
+    import numpy as np
+    from PIL import Image
+    import io
+
+    pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    img_np = np.array(pil_img)
+    face_locs = face_recognition.face_locations(img_np, model="hog")
+
+    if len(face_locs) == 0:
+        raise HTTPException(
+            status_code=422,
+            detail="No se detectó un rostro. Asegúrate de estar frente a la cámara con buena iluminación."
+        )
+    if len(face_locs) > 1:
+        raise HTTPException(
+            status_code=422,
+            detail="Se detectaron múltiples rostros. Asegúrate de estar solo frente a la cámara."
+        )
+
+    # Extraer embedding facial (ahora que sabemos que hay exactamente 1 rostro)
+    try:
+        embedding = biometric_service.get_embedding(image_bytes)
+        if not embedding:
+            raise HTTPException(
+                status_code=422,
+                detail="No se pudo procesar el rostro. Intenta de nuevo con mejor iluminación."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Error al procesar la imagen facial: {str(e)}"
+        )
+
     # 1. Verificar si ya existe en perfiles (RU o CI)
     existing_user = supabase_admin.table("profiles").select("*").or_(f"reg_univ.eq.{user_in.reg_univ},id_card.eq.{user_in.id_card}").execute()
     if existing_user.data:
@@ -64,7 +111,6 @@ async def register(user_in: UserCreate, request: Request):
         raise HTTPException(status_code=400, detail="El RU o CI ya están registrados")
 
     # 2. Crear usuario en Auth de Supabase usando Admin API
-    # Esto evita la necesidad de confirmación por email y asegura la creación del perfil vía trigger
     try:
         auth_response = supabase_admin.auth.admin.create_user({
             "email": user_in.email,
@@ -80,30 +126,23 @@ async def register(user_in: UserCreate, request: Request):
             "email_confirm": True
         })
     except Exception as e:
-        logger.error(f"Error en create_user (Admin): {e}")
-        # Si falla, intentar detectar si es por password corto
         error_msg = str(e)
         if "password" in error_msg.lower():
             error_msg = "La contraseña (CI) debe tener al menos 6 caracteres"
         raise HTTPException(status_code=400, detail=f"Error en Registro: {error_msg}")
-    
+
     if not auth_response:
         raise HTTPException(status_code=400, detail="Error al crear usuario en Auth")
 
-    # En supabase-py 2.x, admin.create_user retorna un objeto que contiene el usuario
-    # Puede ser el objeto User directo o un UserResponse con .user
     user_id = getattr(auth_response, 'id', None)
     if not user_id and hasattr(auth_response, 'user'):
         user_id = auth_response.user.id
-        
+
     if not user_id:
         logger.error(f"No se pudo obtener el ID del usuario. Respuesta: {auth_response}")
         raise HTTPException(status_code=500, detail="Error interno al procesar el registro")
 
     # 2.5 Safety net: crear/actualizar perfil explícitamente
-    # El trigger on_auth_user_created debería crear el perfil automáticamente,
-    # pero por si falla o los metadatos caen en raw_app_meta_data, aseguramos
-    # que el perfil exista con los datos correctos.
     profile_data = {
         "id": user_id,
         "name": user_in.name,
@@ -117,31 +156,34 @@ async def register(user_in: UserCreate, request: Request):
     }
     supabase_admin.table("profiles").upsert(profile_data, ignore_duplicates=False).execute()
 
-    # 3. Procesar foto y guardarla en Storage
-    photo_url = None
-    if user_in.photo_base64:
+    # 3. Guardar foto en Storage y embedding facial (con rollback si falla)
+    try:
         photo_path = f"estudiantes/{user_id}.jpg"
         photo_url = upload_base64_image(user_in.photo_base64, "photos-estudiantes", photo_path)
-        
-        # Actualizar perfil con la URL de la foto
+
         if photo_url:
             supabase_admin.table("profiles").update({"photo_url": photo_url}).eq("id", user_id).execute()
 
-        # 4. Generar y guardar embedding facial
+        supabase_admin.table("face_embeddings").upsert({
+            "user_id": user_id,
+            "embedding": embedding
+        }).execute()
+    except Exception as e:
+        logger.error(f"Error al guardar foto/embedding, haciendo rollback del usuario {user_id}: {e}")
+        # Rollback: eliminar el usuario creado
         try:
-            image_bytes = process_base64_image(user_in.photo_base64)
-            embedding = biometric_service.get_embedding(image_bytes)
-            if embedding:
-                supabase_admin.table("face_embeddings").upsert({
-                    "user_id": user_id,
-                    "embedding": embedding
-                }).execute()
-        except Exception as e:
-            logger.error(f"Falla al generar embedding: {e}")
+            supabase_admin.auth.admin.delete_user(user_id)
+        except Exception as del_err:
+            logger.error(f"Error al eliminar usuario {user_id} durante rollback: {del_err}")
+        try:
+            supabase_admin.table("profiles").delete().eq("id", user_id).execute()
+        except Exception as del_err:
+            logger.error(f"Error al eliminar perfil {user_id} durante rollback: {del_err}")
+        raise HTTPException(status_code=500, detail="Error al guardar los datos biométricos. Intenta de nuevo.")
 
-    # 5. Recuperar perfil final
+    # 4. Recuperar perfil final
     profile_response = supabase_admin.table("profiles").select("*").eq("id", user_id).single().execute()
-    
+
     if not profile_response.data:
         await log_audit(
             usuario=user_in.reg_univ,

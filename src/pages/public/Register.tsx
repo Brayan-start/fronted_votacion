@@ -15,6 +15,7 @@ import {
   Info,
   UserCheck,
   RefreshCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -37,6 +38,7 @@ const Register: React.FC = () => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [faceError, setFaceError] = useState<string | null>(null);
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -77,11 +79,13 @@ const Register: React.FC = () => {
 
   const handleCapture = (image: string) => {
     setCapturedImage(image);
+    setFaceError(null);
     setIsCameraModalOpen(false);
   };
 
   const handleFinalSubmit = async () => {
     setLoading(true);
+    setFaceError(null);
     try {
       await authService.register({
         name: formData.name,
@@ -91,14 +95,19 @@ const Register: React.FC = () => {
         email: formData.email,
         password: formData.idCard,
         role: 'student' as const,
-        photo_base64: capturedImage,
+        photo_base64: capturedImage!,
       });
       setStep(5);
       showToast('success', 'Registro guardado correctamente', 'Tu cuenta ha sido creada exitosamente.');
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { detail?: string } } };
+      const error = err as { response?: { data?: { detail?: string }; status?: number } };
       const msg = error.response?.data?.detail || 'Error al registrar usuario. Intenta de nuevo.';
-      showToast('error', 'Error al guardar información', msg);
+      const status = error.response?.status;
+      if (status === 422) {
+        setFaceError(msg);
+      } else {
+        showToast('error', 'Error al guardar información', msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -179,6 +188,17 @@ const Register: React.FC = () => {
               <h2 className="text-2xl font-bold text-[var(--text-primary)]">Finalizar Registro</h2>
               <p className="text-[var(--text-secondary)]">Resumen de información</p>
             </div>
+
+            {faceError && (
+              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3">
+                <AlertTriangle size={20} className="text-red-400 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-red-400">Error de validación facial</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-1">{faceError}</p>
+                </div>
+              </div>
+            )}
+
             <div className="bg-[var(--bg-tertiary)]/50 border border-[var(--border-color)] rounded-[2rem] p-6 shadow-xl flex items-center gap-6">
               <div className="w-24 h-24 rounded-2xl overflow-hidden bg-[var(--bg-input)] border-2 border-[var(--border-color)] flex-shrink-0 shadow-sm">
                 {capturedImage && <img src={capturedImage} alt="Profile" className="w-full h-full object-cover" />}
@@ -197,8 +217,8 @@ const Register: React.FC = () => {
               </p>
             </div>
             <div className="flex gap-4">
-              <Button variant="outline" size="full" onClick={() => setStep(3)} disabled={loading}><ArrowLeft size={18} className="mr-2" /> Volver</Button>
-              <Button size="full" onClick={handleFinalSubmit} loading={loading} className="bg-gradient-to-r from-blue-600 to-indigo-600 py-5">Confirmar y Registrar</Button>
+              <Button variant="outline" size="full" onClick={() => { setFaceError(null); setStep(3); }} disabled={loading}><ArrowLeft size={18} className="mr-2" /> Reintentar captura</Button>
+              <Button size="full" onClick={handleFinalSubmit} loading={loading} disabled={!capturedImage} className="bg-gradient-to-r from-blue-600 to-indigo-600 py-5">Confirmar y Registrar</Button>
             </div>
           </motion.div>
         );
@@ -245,7 +265,12 @@ const Register: React.FC = () => {
 
       <CameraModal 
         isOpen={isCameraModalOpen} 
-        onClose={() => setIsCameraModalOpen(false)} 
+        onClose={() => {
+          if (!capturedImage) {
+            showToast('warning', 'Escaneo facial obligatorio', 'Debes tomar una foto de tu rostro para completar el registro.');
+          }
+          setIsCameraModalOpen(false);
+        }} 
         onCapture={handleCapture} 
         mode="capture"
         title="Registro de Identidad"
