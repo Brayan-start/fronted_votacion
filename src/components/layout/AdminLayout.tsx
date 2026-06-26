@@ -5,6 +5,7 @@ import {
   Vote, 
   Layers, 
   Users, 
+  UserCheck,
   BarChart3, 
   LogOut, 
   Menu, 
@@ -34,6 +35,7 @@ const AdminLayout: React.FC = () => {
     { icon: Users, label: 'Candidatos', path: '/admin/candidates' },
     { icon: BarChart3, label: 'Resultados', path: '/admin/results' },
     { icon: Users, label: 'Estudiantes', path: '/admin/students' },
+    { icon: UserCheck, label: 'Usuarios Registrados', path: '/admin/usuarios' },
     { icon: Shield, label: 'Auditoría', path: '/admin/auditoria' },
   ];
 

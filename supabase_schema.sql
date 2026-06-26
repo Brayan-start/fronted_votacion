@@ -70,26 +70,50 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  _name TEXT;
+  _last_name TEXT;
+  _reg_univ TEXT;
+  _id_card TEXT;
+  _role TEXT;
+  _career TEXT;
 BEGIN
+  -- Leer de raw_user_meta_data primero; si está vacío, buscar en raw_app_meta_data
+  _name := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'name', ''),
+    NULLIF(NEW.raw_app_meta_data->>'name', ''),
+    ''
+  );
+  _last_name := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'last_name', ''),
+    NULLIF(NEW.raw_app_meta_data->>'last_name', ''),
+    ''
+  );
+  _reg_univ := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'reg_univ', ''),
+    NULLIF(NEW.raw_app_meta_data->>'reg_univ', ''),
+    ''
+  );
+  _id_card := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'id_card', ''),
+    NULLIF(NEW.raw_app_meta_data->>'id_card', ''),
+    ''
+  );
+  _role := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'role', ''),
+    NULLIF(NEW.raw_app_meta_data->>'role', ''),
+    'student'
+  );
+  _career := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'career', ''),
+    NULLIF(NEW.raw_app_meta_data->>'career', '')
+  );
+
   INSERT INTO public.profiles (
-    id,
-    name,
-    last_name,
-    reg_univ,
-    id_card,
-    email,
-    role,
-    career
+    id, name, last_name, reg_univ, id_card, email, role, career
   )
   VALUES (
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'name', ''),
-    COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
-    COALESCE(NEW.raw_user_meta_data->>'reg_univ', ''),
-    COALESCE(NEW.raw_user_meta_data->>'id_card', ''),
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'role', 'student'),
-    NEW.raw_user_meta_data->>'career'
+    NEW.id, _name, _last_name, _reg_univ, _id_card, NEW.email, _role, _career
   )
   ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
@@ -204,6 +228,7 @@ ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
 -- Migración: agregar columna password_changed a perfiles existentes
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS password_changed BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS session_token UUID NOT NULL DEFAULT gen_random_uuid();
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- Para crear un admin despues de registrar un usuario:
 -- UPDATE public.profiles SET role = 'admin' WHERE reg_univ = 'TU_RU';

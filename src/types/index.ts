@@ -11,6 +11,7 @@ export interface User {
   photo_url?: string;
   career?: string;
   password_changed?: boolean;
+  is_active?: boolean;
   created_at?: string;
 }
 

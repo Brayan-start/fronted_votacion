@@ -42,6 +42,7 @@ class UserResponse(UserBase):
     id: str
     photo_url: Optional[str] = None
     password_changed: Optional[bool] = False
+    is_active: Optional[bool] = True
     created_at: datetime
 
     class Config:

@@ -99,7 +99,24 @@ async def register(user_in: UserCreate, request: Request):
     if not user_id:
         logger.error(f"No se pudo obtener el ID del usuario. Respuesta: {auth_response}")
         raise HTTPException(status_code=500, detail="Error interno al procesar el registro")
-    
+
+    # 2.5 Safety net: crear/actualizar perfil explícitamente
+    # El trigger on_auth_user_created debería crear el perfil automáticamente,
+    # pero por si falla o los metadatos caen en raw_app_meta_data, aseguramos
+    # que el perfil exista con los datos correctos.
+    profile_data = {
+        "id": user_id,
+        "name": user_in.name,
+        "last_name": user_in.last_name,
+        "reg_univ": user_in.reg_univ,
+        "id_card": user_in.id_card,
+        "email": user_in.email,
+        "role": user_in.role.value,
+        "career": user_in.career,
+        "is_active": True,
+    }
+    supabase_admin.table("profiles").upsert(profile_data, ignore_duplicates=False).execute()
+
     # 3. Procesar foto y guardarla en Storage
     photo_url = None
     if user_in.photo_base64:
@@ -192,6 +209,22 @@ async def login(login_data: LoginRequest, request: Request):
     
     profile = user_query.data[0]
     user_id = profile["id"]
+
+    # 1.5 Verificar si la cuenta está activa
+    if not profile.get("is_active", True):
+        logger.warning(f"Cuenta deshabilitada para RU: {login_data.reg_univ}")
+        await log_audit(
+            usuario=login_data.reg_univ,
+            rol=profile.get("role", "student"),
+            accion="Inicio de sesión fallido",
+            detalle="Cuenta deshabilitada por el administrador",
+            ip=client_ip,
+            resultado="error",
+        )
+        raise HTTPException(
+            status_code=401,
+            detail="Tu cuenta ha sido deshabilitada por el administrador.",
+        )
 
     # 2. Validar contraseña contra Supabase Auth.
     #    El campo id_card del request contiene la contraseña

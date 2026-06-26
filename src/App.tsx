@@ -23,6 +23,7 @@ import Candidates from './pages/admin/Candidates';
 import Students from './pages/admin/Students';
 import Results from './pages/admin/Results';
 import Auditoria from './pages/admin/Auditoria';
+import UsuariosRegistrados from './pages/admin/UsuariosRegistrados';
 
 // Student Pages
 import StudentDashboard from './pages/student/Dashboard';
@@ -62,6 +63,7 @@ const App: React.FC = () => {
             <Route path="candidates" element={<Candidates />} />
             <Route path="results" element={<Results />} />
             <Route path="students" element={<Students />} />
+            <Route path="usuarios" element={<UsuariosRegistrados />} />
             <Route path="auditoria" element={<Auditoria />} />
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
           </Route>
