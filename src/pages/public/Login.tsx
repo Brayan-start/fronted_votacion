@@ -111,13 +111,16 @@ const Login: React.FC = () => {
         setRecaptchaError(true);
       }
 
-      Swal.fire({
+      await Swal.fire({
         icon: 'error',
         title: 'Error al iniciar sesión',
         text: detail,
         confirmButtonColor: '#ef4444',
         background: theme === 'dark' ? '#1a1d29' : '#ffffff',
         color: theme === 'dark' ? '#f1f5f9' : '#0f172a',
+        confirmButtonText: 'OK',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
       });
     } finally {
       setLoading(false);
