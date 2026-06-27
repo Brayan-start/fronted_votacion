@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 import logging
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from app.models.schemas import ElectionResponse, CategoryResponse, CandidateResponse, ElectionCreate, CategoryCreate, UserResponse
 from app.db.supabase import supabase, supabase_admin
 from app.routers.deps import get_current_user
@@ -86,7 +87,10 @@ async def update_election(election_id: str, election_in: dict, current_user: Use
             new_end_date = datetime.fromisoformat(end_date_str)
             if new_end_date.tzinfo is None:
                 new_end_date = new_end_date.replace(tzinfo=timezone.utc)
-            if new_end_date < datetime.now(timezone.utc):
+            bolivia_tz = ZoneInfo("America/La_Paz")
+            now = datetime.now(bolivia_tz)
+            end_date_local = new_end_date.astimezone(bolivia_tz)
+            if end_date_local < now:
                 raise HTTPException(
                     status_code=400,
                     detail="No se puede activar una elección cuya fecha de finalización ya pasó. Actualice la fecha de fin primero."

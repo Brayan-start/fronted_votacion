@@ -19,7 +19,20 @@ const Elections: React.FC = () => {
   const [currentElection, setCurrentElection] = useState<Partial<Election> | null>(null);
   const [electionToDelete, setElectionToDelete] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [startTime, setStartTime] = useState('08:00');
+  const [endTime, setEndTime] = useState('16:00');
   const { showToast } = useToast();
+
+  const extractTime = (isoStr: string | undefined): string => {
+    if (!isoStr) return '08:00';
+    const match = isoStr.match(/T(\d{2}:\d{2})/);
+    return match ? match[1] : '08:00';
+  };
+
+  const getDatePart = (dateStr: string | undefined): string => {
+    if (!dateStr) return '';
+    return dateStr.split('T')[0];
+  };
 
   const fetchElections = async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -41,6 +54,8 @@ const Elections: React.FC = () => {
       title: '', description: '', start_date: '', end_date: '', 
       status: 'inactive' as const, type: 'rectorado' as const
     });
+    setStartTime(election ? extractTime(election.start_date) : '08:00');
+    setEndTime(election ? extractTime(election.end_date) : '16:00');
     setIsModalOpen(true);
   };
 
@@ -48,12 +63,17 @@ const Elections: React.FC = () => {
     if (!currentElection?.title || !currentElection?.start_date || !currentElection?.end_date) return;
     setIsSaving(true);
     try {
+      const payload = {
+        ...currentElection,
+        start_date: `${getDatePart(currentElection.start_date)}T${startTime}:00`,
+        end_date: `${getDatePart(currentElection.end_date)}T${endTime}:00`,
+      };
       if (currentElection.id) {
-        const updated = await electionService.update(currentElection.id, currentElection);
+        const updated = await electionService.update(currentElection.id, payload);
         showToast('success', 'Elección actualizada', 'Los datos se guardaron correctamente.');
         setElections(prev => prev.map(e => e.id === updated.id ? updated : e));
       } else {
-        const created = await electionService.create(currentElection);
+        const created = await electionService.create(payload);
         showToast('success', 'Elección creada', 'El proceso electoral se registró exitosamente.');
         setElections(prev => [created, ...prev]);
       }
@@ -278,22 +298,38 @@ const Elections: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Input 
-              label="Fecha Inicio" 
-              type="date" 
-              value={currentElection?.start_date && !isNaN(new Date(currentElection.start_date).getTime()) 
-                ? new Date(currentElection.start_date).toISOString().split('T')[0] 
-                : currentElection?.start_date || ''} 
-              onChange={(e) => setCurrentElection({...currentElection!, start_date: e.target.value})}
-            />
-            <Input 
-              label="Fecha Fin" 
-              type="date" 
-              value={currentElection?.end_date && !isNaN(new Date(currentElection.end_date).getTime()) 
-                ? new Date(currentElection.end_date).toISOString().split('T')[0] 
-                : currentElection?.end_date || ''} 
-              onChange={(e) => setCurrentElection({...currentElection!, end_date: e.target.value})}
-            />
+            <div className="space-y-2">
+              <Input 
+                label="Fecha Inicio" 
+                type="date" 
+                value={currentElection?.start_date && !isNaN(new Date(currentElection.start_date).getTime()) 
+                  ? new Date(currentElection.start_date).toISOString().split('T')[0] 
+                  : currentElection?.start_date || ''} 
+                onChange={(e) => setCurrentElection({...currentElection!, start_date: e.target.value})}
+              />
+              <Input 
+                label="Hora Inicio" 
+                type="time" 
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Input 
+                label="Fecha Fin" 
+                type="date" 
+                value={currentElection?.end_date && !isNaN(new Date(currentElection.end_date).getTime()) 
+                  ? new Date(currentElection.end_date).toISOString().split('T')[0] 
+                  : currentElection?.end_date || ''} 
+                onChange={(e) => setCurrentElection({...currentElection!, end_date: e.target.value})}
+              />
+              <Input 
+                label="Hora Fin" 
+                type="time" 
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       </Modal>
