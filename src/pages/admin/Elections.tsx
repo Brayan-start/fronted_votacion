@@ -49,11 +49,13 @@ const Elections: React.FC = () => {
     setIsSaving(true);
     try {
       if (currentElection.id) {
-        await electionService.update(currentElection.id, currentElection);
+        const updated = await electionService.update(currentElection.id, currentElection);
         showToast('success', 'Elección actualizada', 'Los datos se guardaron correctamente.');
+        setElections(prev => prev.map(e => e.id === updated.id ? updated : e));
       } else {
-        await electionService.create(currentElection);
+        const created = await electionService.create(currentElection);
         showToast('success', 'Elección creada', 'El proceso electoral se registró exitosamente.');
+        setElections(prev => [created, ...prev]);
       }
       setIsModalOpen(false);
       await fetchElections(true);

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 import logging
+from datetime import datetime, timezone
 from app.models.schemas import ElectionResponse, CategoryResponse, CandidateResponse, ElectionCreate, CategoryCreate, UserResponse
 from app.db.supabase import supabase, supabase_admin
 from app.routers.deps import get_current_user
@@ -76,6 +77,22 @@ async def get_election(election_id: str, _=Depends(refresh_election_statuses)):
 async def update_election(election_id: str, election_in: dict, current_user: UserResponse = Depends(get_current_user)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    new_status = election_in.get("status")
+    new_end_date_str = election_in.get("end_date")
+    if new_status == "active" and new_end_date_str:
+        try:
+            end_date_str = new_end_date_str.replace("Z", "+00:00") if isinstance(new_end_date_str, str) else new_end_date_str
+            new_end_date = datetime.fromisoformat(end_date_str)
+            if new_end_date.tzinfo is None:
+                new_end_date = new_end_date.replace(tzinfo=timezone.utc)
+            if new_end_date < datetime.now(timezone.utc):
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se puede activar una elección cuya fecha de finalización ya pasó. Actualice la fecha de fin primero."
+                )
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="Formato de fecha inválido en end_date")
 
     update_data = {k: v for k, v in election_in.items() if k not in ['id', 'created_at']}
     response = supabase_admin.table("elections").update(update_data).eq("id", election_id).execute()

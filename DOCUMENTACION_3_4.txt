@@ -1,0 +1,651 @@
+===============================================================================
+3.4. IMPLEMENTACIÓN DEL SISTEMA
+===============================================================================
+
+El presente capítulo describe el entorno tecnológico, el proceso de despliegue 
+y las evidencias de funcionamiento del Sistema Online de Elecciones Electorales 
+con Autenticación Facial (UPEA Vota). Se detallan las plataformas, herramientas, 
+comandos y configuraciones utilizadas para llevar el sistema desde el entorno 
+de desarrollo hasta un ambiente de producción accesible desde internet.
+
+
+-------------------------------------------------------------------------------
+3.4.1. AMBIENTE DE IMPLEMENTACIÓN
+-------------------------------------------------------------------------------
+
+3.4.1.1. Arquitectura General
+
+El sistema sigue una arquitectura de tres capas desacopladas:
+
+  Frontend (React + Vite)  ──HTTP──>  Backend (FastAPI)  ──SDK──>  Supabase
+                                                                       │
+                                                                  ┌─────┴─────┐
+                                                                  │ PostgreSQL │
+                                                                  │ Storage    │
+                                                                  │ Auth       │
+                                                                  └───────────┘
+
+Cada capa se despliega en una plataforma independiente y se comunica 
+exclusivamente a través de APIs REST con autenticación JWT.
+
+
+3.4.1.2. Plataformas de Despliegue
+
+  ┌────────────┬────────────────────┬──────────────────────────────────────┐
+  │ Componente │ Plataforma         │ Plan                                 │
+  ├────────────┼────────────────────┼──────────────────────────────────────┤
+  │ Backend    │ Render (Web Service) │ Free tier: 512 MB RAM, 1 CPU       │
+  │ Frontend   │ Vercel             │ Free tier: CDN global, HTTPS auto    │
+  │ Base Datos │ Supabase           │ Free tier: 500 MB PostgreSQL,        │
+  │            │                    │ 1 GB Storage, Auth incorporado       │
+  │ Repositorio│ GitHub             │ Free tier: repositorios privados     │
+  └────────────┴────────────────────┴──────────────────────────────────────┘
+
+Región de todos los servicios: South America (São Paulo), para minimizar 
+latencia en el contexto universitario boliviano.
+
+
+3.4.1.3. Stack Tecnológico
+
+Backend (Python 3.11.11 — especificado en runtime.txt):
+  ┌──────────────────────────┬──────────┬────────────────────────────────┐
+  │ Dependencia              │ Versión  │ Propósito                      │
+  ├──────────────────────────┼──────────┼────────────────────────────────┤
+  │ fastapi                  │ 0.115.6  │ Framework web asíncrono        │
+  │ uvicorn[standard]        │ 0.34.0   │ Servidor ASGI                  │
+  │ supabase                 │ 2.11.0   │ SDK cliente de Supabase        │
+  │ pydantic[email]          │ 2.10.4   │ Validación de esquemas         │
+  │ python-jose[cryptography]│ 3.3.0    │ Creación/verificación JWT      │
+  │ passlib[bcrypt]          │ 1.7.4    │ Hashing de contraseñas         │
+  │ Pillow                   │ 11.1.0   │ Procesamiento de imágenes      │
+  │ dlib-bin                 │ 19.24.6  │ Reconocimiento facial (HOG)    │
+  │ face-recognition-models  │ 0.3.0    │ Modelos preentrenados de rostro│
+  │ opencv-python-headless   │ 4.11.0.86│ Visión artificial              │
+  │ numpy                    │ 2.2.2    │ Cómputo numérico               │
+  │ httpx                    │ 0.28.1   │ Cliente HTTP (reCAPTCHA)       │
+  │ brevo-python             │ 1.0.0    │ Envío de correos transaccional │
+  │ pydantic-settings        │ 2.7.1    │ Configuración por entorno      │
+  │ python-multipart         │ 0.0.20   │ Soporte para formularios       │
+  │ setuptools               │ <81      │ Compatibilidad con modelos     │
+  │ requests                 │ (última) │ Descarga de imágenes           │
+  └──────────────────────────┴──────────┴────────────────────────────────┘
+
+  Archivo de dependencias: requirements.txt (55 líneas).
+  Para entornos sin compilación de dlib existe requirements-no-face.txt 
+  como plan de contingencia.
+
+Frontend (React 19 + TypeScript 6.0 + Vite 8):
+  ┌──────────────────────────┬──────────┬────────────────────────────────┐
+  │ Dependencia              │ Versión  │ Propósito                      │
+  ├──────────────────────────┼──────────┼────────────────────────────────┤
+  │ react                    │ 19.2.5   │ Librería UI                    │
+  │ react-dom                │ 19.2.5   │ Renderizado DOM                │
+  │ react-router-dom         │ 7.14.2   │ Enrutamiento SPA               │
+  │ axios                    │ 1.16.0   │ Cliente HTTP                   │
+  │ framer-motion            │ 12.38.0  │ Animaciones                    │
+  │ tailwindcss              │ 4.0.0    │ Framework CSS (utility-first)  │
+  │ lucide-react             │ 1.14.0   │ Iconos SVG                     │
+  │ recharts                 │ 3.8.1    │ Gráficos y estadísticas        │
+  │ react-webcam             │ 7.2.0    │ Captura de cámara web          │
+  │ react-google-recaptcha   │ 3.1.0    │ Integración reCAPTCHA v2       │
+  │ jspdf                    │ 4.2.1    │ Generación de PDF (carnet)     │
+  │ qrcode                   │ 1.5.4    │ Generación de códigos QR       │
+  │ sweetalert2              │ 11.26.25 │ Diálogos de confirmación       │
+  └──────────────────────────┴──────────┴────────────────────────────────┘
+
+  Archivo de dependencias: package.json (46 líneas).
+  Build: tsc -b && vite build → genera directorio dist/.
+
+
+3.4.1.4. Base de Datos
+
+Plataforma: Supabase (PostgreSQL 15+ administrado).
+Esquema: definido en supabase_schema.sql (234 líneas) con 8 tablas:
+
+  Tabla               │ Columnas principales
+  ────────────────────┼────────────────────────────────────────────────
+  profiles            │ id, name, last_name, reg_univ, id_card, email,
+                      │ role (admin|student), career, photo_url,
+                      │ password_changed, session_token, is_active, created_at
+  elections           │ id, title, description, start_date, end_date,
+                      │ status (active|inactive|closed), type, created_at
+  categories          │ id, name, election_id (FK), created_at
+  candidates          │ id, name, description, photo_url, video_url,
+                      │ category_id (FK), career, created_at
+  face_embeddings     │ id, user_id (FK), embedding (FLOAT8[]), created_at
+  votes               │ id, user_id (FK), election_id (FK), category_id (FK),
+                      │ candidate_id (FK), created_at
+  audit_logs          │ id, usuario, rol, accion, detalle, ip,
+                      │ resultado (exito|error), created_at
+  password_reset_codes│ id, email, code_hash, expires_at, used, created_at
+
+Además incluye:
+  - Trigger on_auth_user_created: crea automáticamente un perfil en 
+    public.profiles cuando un usuario se registra en auth.users.
+  - Vista vote_results: agregación de votos por candidato/categoría/elección.
+  - Índices: en reg_univ, election_id, category_id, candidate_id, 
+    audit_logs (acción, usuario, fecha).
+  - Buckets de Storage: photos-estudiantes (público), candidates (público).
+  - Políticas RLS: control de acceso a nivel de fila para cada tabla.
+
+
+3.4.1.5. Variables de Entorno
+
+El sistema requiere las siguientes variables, configuradas en el Dashboard 
+de cada plataforma (NUNCA en archivos .env en producción):
+
+  ┌─────────────────────────────┬─────────────────────────────────────────┐
+  │ Variable                    │ Propósito                               │
+  ├─────────────────────────────┼─────────────────────────────────────────┤
+  │ SUPABASE_URL                │ URL del proyecto Supabase               │
+  │ SUPABASE_KEY                │ Llave anónima pública                    │
+  │ SUPABASE_SERVICE_ROLE_KEY   │ Llave de servicio (secreta, bypass RLS) │
+  │ JWT_SECRET                  │ Clave para firmar tokens JWT            │
+  │ CORS_ORIGINS                │ Dominios permitidos (separados por coma)│
+  │ RECAPTCHA_SECRET_KEY        │ Clave secreta de Google reCAPTCHA v2    │
+  │ RECAPTCHA_SKIP_VERIFICATION │ Saltar verificación (false en prod)     │
+  │ FACE_MATCH_THRESHOLD        │ Umbral de coincidencia facial (0.55)    │
+  │ SMTP_SERVER                 │ Servidor SMTP (opcional)               │
+  │ SMTP_PORT                   │ Puerto SMTP (587)                      │
+  │ SMTP_USER                   │ Usuario SMTP (opcional)                 │
+  │ SMTP_PASSWORD               │ Contraseña SMTP (opcional)             │
+  │ SMTP_FROM_EMAIL             │ Remitente de correos                    │
+  │ VITE_API_URL                │ URL del backend (frontend)             │
+  │ VITE_RECAPTCHA_SITE_KEY     │ Site Key de reCAPTCHA (frontend)       │
+  └─────────────────────────────┴─────────────────────────────────────────┘
+
+  Backend: define la conexión en app/db/supabase.py usando dos clientes:
+    - supabase (anon key) — para operaciones del lado del cliente.
+    - supabase_admin (service role) — para operaciones administrativas 
+      que requieren bypass de RLS.
+
+  Frontend: las variables VITE_* se inyectan en tiempo de construcción 
+  (build time) por Vite, según archivo vite.config.ts.
+
+
+3.4.1.6. Requisitos de Hardware y Software
+
+  Requisitos mínimos para desarrollo local:
+  ┌──────────┬──────────────────────────────────────────────────────────┐
+  │ Recurso  │ Especificación                                           │
+  ├──────────┼──────────────────────────────────────────────────────────┤
+  │ SO       │ Windows 10+, Linux (Ubuntu 20.04+) o macOS 12+          │
+  │ CPU      │ Dual-core 2.0 GHz (4 núcleos recomendado para dlib)      │
+  │ RAM      │ 4 GB (8 GB recomendado para compilar dlib)               │
+  │ Disco    │ 2 GB libres                                              │
+  │ Python   │ 3.10+ (3.11.11 en producción)                           │
+  │ Node.js  │ 18+ (LTS)                                               │
+  │ Cámara   │ Webcam integrada o externa (para pruebas biométricas)    │
+  └──────────┴──────────────────────────────────────────────────────────┘
+
+  Requisitos en producción (planes gratuitos):
+  ┌──────────┬──────────────────────────────────────────────────────────┐
+  │ Recurso  │ Especificación                                           │
+  ├──────────┼──────────────────────────────────────────────────────────┤
+  │ Render   │ 512 MB RAM, 1 vCPU, 15 min de timeout por inactividad   │
+  │ Vercel   │ CDN global, 100 GB ancho de banda/mes                    │
+  │ Supabase │ 500 MB PostgreSQL, 1 GB Storage, 2 proyectos gratis     │
+  └──────────┴──────────────────────────────────────────────────────────┘
+
+
+-------------------------------------------------------------------------------
+3.4.2. SIMULACIÓN DE IMPLEMENTACIÓN
+-------------------------------------------------------------------------------
+
+3.4.2.1. Preparación del Repositorio
+
+Paso 1: Inicializar Git y subir el código a GitHub.
+
+  git init
+  git add .
+  git commit -m "Inicializar proyecto UPEA Vota"
+  git branch -M main
+  git remote add origin https://github.com/tu-usuario/fronted_votacion.git
+  git push -u origin main
+
+
+3.4.2.2. Configuración de Supabase (Base de Datos)
+
+Paso 2: Crear un proyecto en Supabase.
+
+  1. Ingresar a https://supabase.com e iniciar sesión con GitHub.
+  2. Crear nuevo proyecto con nombre "upea-vota-produccion".
+  3. Establecer contraseña segura para la base de datos.
+  4. Seleccionar región "South America (São Paulo)".
+  5. Esperar 2-3 minutos mientras se aprovisiona la instancia.
+
+Paso 3: Obtener credenciales de API.
+
+  En Supabase Dashboard → Project Settings → API:
+    - Project URL → SUPABASE_URL
+    - anon public → SUPABASE_KEY
+    - service_role (secreta) → SUPABASE_SERVICE_ROLE_KEY
+
+Paso 4: Ejecutar el esquema de base de datos.
+
+  1. Abrir Supabase Dashboard → SQL Editor → New query.
+  2. Copiar el contenido completo de supabase_schema.sql (234 líneas).
+  3. Ejecutar la consulta. Verificar que no haya errores.
+  4. Confirmar en Storage que existan los buckets:
+     - photos-estudiantes (público)
+     - candidates (público)
+
+  El script crea automáticamente las 8 tablas, el trigger de creación 
+  de perfiles, los índices, las políticas RLS, la vista vote_results 
+  y los buckets de almacenamiento.
+
+Paso 5: Configurar Google reCAPTCHA v2.
+
+  1. Ingresar a https://www.google.com/recaptcha/admin.
+  2. Crear nueva clave tipo "reCAPTCHA v2" → "No soy un robot".
+  3. Agregar dominios: localhost, el frontend de Vercel y el backend de Render.
+  4. Copiar Site Key → VITE_RECAPTCHA_SITE_KEY (frontend).
+  5. Copiar Secret Key → RECAPTCHA_SECRET_KEY (backend).
+
+
+3.4.2.3. Despliegue del Backend en Render
+
+Paso 6: Crear el Web Service.
+
+  1. Ingresar a https://render.com e iniciar sesión con GitHub.
+  2. Hacer clic en "New +" → "Web Service".
+  3. Conectar el repositorio de GitHub (fronted_votacion).
+  4. Configurar los parámetros del servicio:
+
+     ┌────────────────────┬────────────────────────────────────────────────┐
+     │ Parámetro          │ Valor                                          │
+     ├────────────────────┼────────────────────────────────────────────────┤
+     │ Name               │ upea-vota-api                                  │
+     │ Region             │ South America (São Paulo)                      │
+     │ Branch             │ main                                           │
+     │ Runtime            │ Python 3                                       │
+     │ Build Command      │ pip install -r requirements.txt &&             │
+     │                    │ pip install face_recognition==1.3.0 --no-deps   │
+     │ Start Command      │ uvicorn app.main:app --host 0.0.0.0            │
+     │                    │ --port $PORT --forwarded-allow-ips '*'          │
+     │ Plan               │ Free                                           │
+     └────────────────────┴────────────────────────────────────────────────┘
+
+  5. En la sección "Advanced" → "Environment Variables", agregar:
+
+     SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_ROLE_KEY,
+     JWT_SECRET, CORS_ORIGINS, RECAPTCHA_SECRET_KEY,
+     RECAPTCHA_SKIP_VERIFICATION=false, FACE_MATCH_THRESHOLD=0.55,
+     SMTP_SERVER, SMTP_PORT=587, SMTP_USER, SMTP_PASSWORD,
+     SMTP_FROM_EMAIL (opcionales).
+
+  6. Hacer clic en "Deploy Web Service".
+
+  Render ejecuta el build command, que instala las dependencias Python 
+  (incluyendo dlib-bin, face_recognition y opencv), y luego inicia 
+  el servidor con uvicorn.
+
+  Problema encontrado: La compilación de dlib desde fuente excede el 
+  límite de 15 minutos del plan gratuito de Render.
+  
+  Solución implementada: Se usa dlib-bin (wheel precompilado) en lugar 
+  de dlib (fuente), y face_recognition se instala con --no-deps para 
+  evitar que arrastre el dlib original. Esto se documenta tanto en 
+  requirements.txt como en el Build Command de render.yaml.
+
+  Al completar el despliegue, la API responde en:
+    https://upea-vota-api.onrender.com/
+  
+  Con respuesta esperada:
+    {"message": "Bienvenido a la API de UPEA Vota", 
+     "status": "online", 
+     "version": "1.0.0"}
+
+  La documentación interactiva de la API está disponible en:
+    https://upea-vota-api.onrender.com/docs
+
+
+3.4.2.4. Despliegue del Frontend en Vercel
+
+Paso 7: Crear el proyecto en Vercel.
+
+  1. Ingresar a https://vercel.com e iniciar sesión con GitHub.
+  2. Hacer clic en "Add New..." → "Project".
+  3. Conectar el repositorio de GitHub (fronted_votacion).
+  4. Vercel detecta automáticamente Vite como framework.
+  5. Configurar:
+
+     ┌────────────────────┬────────────────────────────────────────────────┐
+     │ Parámetro          │ Valor                                          │
+     ├────────────────────┼────────────────────────────────────────────────┤
+     │ Framework Preset   │ Vite (automático)                              │
+     │ Build Command      │ npm run build                                  │
+     │ Output Directory   │ dist                                           │
+     │ Root Directory     │ ./ (raíz del repositorio)                      │
+     └────────────────────┴────────────────────────────────────────────────┘
+
+  6. En "Environment Variables", agregar:
+     VITE_API_URL = https://upea-vota-api.onrender.com/api/v1
+     VITE_RECAPTCHA_SITE_KEY = (site key de Google)
+
+  7. Hacer clic en "Deploy".
+
+  Vercel ejecuta npm install y npm run build (tsc -b && vite build), 
+  generando el directorio dist/ con los archivos estáticos optimizados.
+
+  El archivo vercel.json incluye rewrites para SPA routing:
+    { "source": "/(.*)", "destination": "/index.html" }
+
+  Al completar, el frontend está disponible en:
+    https://fronted-votacion.vercel.app
+
+  Problema encontrado: Las rutas directas (ej. /login, /admin/dashboard) 
+  devolvían 404 porque Vercel buscaba archivos físicos.
+  
+  Solución: Se agregó vercel.json con la regla de rewrite que redirige 
+  todas las rutas a index.html, permitiendo que React Router maneje 
+  la navegación del lado del cliente (SPA routing).
+
+
+3.4.2.5. Creación del Administrador Inicial
+
+Paso 8: Registrar el primer usuario y promoverlo a administrador.
+
+  1. Ingresar al frontend (https://fronted-votacion.vercel.app/register).
+  2. Completar el formulario de registro con datos reales.
+  3. Escanear el rostro (obligatorio para la creación de cuenta).
+  4. Iniciar sesión con el RU y CI registrados.
+  5. En Supabase SQL Editor, ejecutar:
+
+     UPDATE public.profiles 
+     SET role = 'admin' 
+     WHERE reg_univ = 'TU_REGISTRO_UNIVERSITARIO';
+
+  6. Cerrar sesión y volver a iniciar. El sistema redirige automáticamente 
+     al panel de administración (/admin/dashboard).
+
+
+3.4.2.6. Configuración del Pipeline CI/CD
+
+El flujo de despliegue continuo funciona de la siguiente manera:
+
+  ┌──────────┐    git push    ┌──────────┐    webhook    ┌──────────┐
+  │ Desarrollador │ ──────────→ │  GitHub  │ ────────────→ │  Render  │
+  │ (local)       │             │ (main)   │               │ (backend)│
+  └──────────┘                  └──────────┘               └──────────┘
+                                      │                        
+                                      │ webhook                
+                                      ▼                        
+                                 ┌──────────┐                  
+                                 │  Vercel  │                  
+                                 │ (frontend)│                 
+                                 └──────────┘                  
+
+  1. El desarrollador hace commit y push a la rama main en GitHub.
+  2. GitHub notifica automáticamente a Render y Vercel mediante webhooks.
+  3. Render ejecuta el Build Command, instala dependencias Python y 
+     despliega el nuevo backend (2-5 minutos).
+  4. Vercel ejecuta npm install && npm run build, genera dist/ y 
+     despliega el nuevo frontend (1-2 minutos, sin tiempo de inactividad).
+  5. Si se requieren migraciones de base de datos, se ejecutan 
+     manualmente en Supabase SQL Editor.
+
+  NOTA: En Render Free, el servicio se "duerme" después de 15 minutos 
+  sin actividad. La primera solicitud tras inactividad tarda 30-60 
+  segundos en responder. Se recomienda configurar UptimeRobot (gratis) 
+  para hacer ping cada 10 minutos al endpoint raíz de la API.
+
+
+3.4.2.7. Problemas Encontrados y Soluciones
+
+  ┌─────────────────────────────────────────────┬─────────────────────────────────────────────┐
+  │ Problema                                     │ Solución                                     │
+  ├─────────────────────────────────────────────┼─────────────────────────────────────────────┤
+  │ dlib no compila en Render (excede 15 min)    │ Usar dlib-bin (wheel precompilado) y         │
+  │                                             │ face_recognition --no-deps                   │
+  ├─────────────────────────────────────────────┼─────────────────────────────────────────────┤
+  │ Rutas SPA devuelven 404 en Vercel           │ Agregar regla de rewrite en vercel.json      │
+  ├─────────────────────────────────────────────┼─────────────────────────────────────────────┤
+  │ CORS bloquea peticiones del frontend        │ Configurar CORS_ORIGINS con el dominio       │
+  │                                             │ exacto de Vercel (no usar "*" en prod)       │
+  ├─────────────────────────────────────────────┼─────────────────────────────────────────────┤
+  │ reCAPTCHA rechaza todas las solicitudes      │ Registrar dominio del frontend en Google     │
+  │                                             │ reCAPTCHA Admin; verificar RECAPTCHA_SECRET  │
+  ├─────────────────────────────────────────────┼─────────────────────────────────────────────┤
+  │ Imágenes no se suben a Supabase Storage      │ Crear buckets "photos-estudiantes" y         │
+  │                                             │ "candidates" como públicos                   │
+  ├─────────────────────────────────────────────┼─────────────────────────────────────────────┤
+  │ El servicio Render se duerme por inactividad │ Configurar UptimeRobot con ping cada 10 min  │
+  ├─────────────────────────────────────────────┼─────────────────────────────────────────────┤
+  │ setuptools 82+ rompe face_recognition_models │ Fijar setuptools<81 en requirements.txt      │
+  │ (pkg_resources eliminado)                    │                                             │
+  ├─────────────────────────────────────────────┼─────────────────────────────────────────────┤
+  │ El trigger on_auth_user_created no propaga   │ Agregar safety net con upsert explícito     │
+  │ metadatos correctamente (raw_user_meta_data  │ en app/routers/auth.py línea 103-118        │
+  │ vs raw_app_meta_data)                        │                                             │
+  └─────────────────────────────────────────────┴─────────────────────────────────────────────┘
+
+
+3.4.2.8. Comandos de Desarrollo y Despliegue
+
+  Entorno local (desarrollo):
+
+    # Terminal 1 — Backend
+    cd fronted_votacion
+    venv\Scripts\Activate.ps1        # Windows
+    # source venv/bin/activate       # Linux/Mac
+    uvicorn app.main:app --reload    # http://localhost:8000
+
+    # Terminal 2 — Frontend
+    cd fronted_votacion
+    npm install
+    npm run dev                      # http://localhost:5173
+
+  Verificación de calidad:
+
+    npm run lint                     # ESLint
+    npm run build                    # TypeScript + Vite build
+    python -m py_compile app/main.py # Verificación sintáctica Python
+
+  Despliegue:
+
+    git add .
+    git commit -m "Descripción del cambio"
+    git push origin main             # Activa CI/CD automático
+
+
+-------------------------------------------------------------------------------
+3.4.3. EVIDENCIAS DE FUNCIONAMIENTO
+-------------------------------------------------------------------------------
+
+3.4.3.1. Funcionalidades Implementadas y Verificadas
+
+A. Registro de Usuarios
+   - Formulario multi-paso (4 pasos): datos personales, requisitos 
+     biométricos, captura de perfil, resumen y confirmación.
+   - Captura de rostro obligatoria mediante react-webcam.
+   - Validación facial en backend: detección de exactamente 1 rostro 
+     usando face_recognition (HOG + SVM). Si se detectan 0 o múltiples 
+     rostros, se rechaza con error 422.
+   - Extracción de embedding facial (vector de 128 dimensiones) 
+     almacenado en la tabla face_embeddings.
+   - Creación de usuario en Supabase Auth + perfil en public.profiles.
+   - Verificación: query en Supabase SELECT * FROM public.profiles 
+     confirma la creación del perfil. SELECT * FROM public.face_embeddings 
+     confirma el embedding.
+
+B. Autenticación (Login)
+   - Inicio de sesión con RU + CI (contraseña).
+   - Verificación reCAPTCHA v2 ("No soy un robot").
+   - Validación de credenciales contra Supabase Auth con sign_in_with_password.
+   - Generación de token JWT (HS256, expiración 24 horas).
+   - Bloqueo de cuentas deshabilitadas (is_active = false).
+   - Registro en auditoría de cada intento (exitoso o fallido).
+   - Verificación: Login exitoso redirige al dashboard correspondiente 
+     (admin → /admin/dashboard, student → /student/dashboard).
+
+C. Panel de Administración
+   - Dashboard con estadísticas globales (total estudiantes, elecciones 
+     activas, votos emitidos, tasa de participación).
+   - Gestión de elecciones: CRUD completo con fechas, estado y tipo.
+   - Gestión de categorías: creación y eliminación.
+   - Gestión de candidatos: CRUD con foto, descripción y video.
+   - Gestión de estudiantes: listado, búsqueda y eliminación.
+   - Gestión de usuarios registrados: listado completo con estado 
+     (activo/inactivo), toggle de activación/desactivación.
+   - Panel de auditoría: registro paginado de eventos del sistema con 
+     filtros por acción, rol, resultado, fecha y búsqueda general.
+   - Resultados en vivo con gráficos (Recharts) y exportación.
+
+D. Votación Electrónica
+   - Flujo completo: seleccionar elección activa → categoría → candidato.
+   - Verificación biométrica facial obligatoria antes de emitir el voto 
+     (comparación del rostro capturado contra el embedding almacenado).
+   - Control de voto único: UNIQUE(user_id, election_id, category_id) 
+     evita doble votación en la misma categoría.
+   - Registro en auditoría de cada voto emitido.
+   - Verificación: SELECT COUNT(*) FROM votes WHERE user_id = 'X' 
+     confirma un solo voto por categoría.
+
+E. Panel del Estudiante
+   - Dashboard personal con estado de votación.
+   - Historial de votos emitidos.
+   - Carnet de sufragio digital (PDF generado con jsPDF + QR).
+   - Perfil: edición de datos y cambio de foto.
+   - Cambio de contraseña.
+
+F. Seguridad y Auditoría
+   - Todas las acciones críticas se registran en audit_logs:
+     registro, inicio de sesión (éxito/fallo), cambio de contraseña, 
+     emisión de voto, cierre de sesión, acciones administrativas.
+   - JWT con session_token: al cerrar sesión en todos los dispositivos, 
+     se invalida el token regenerando el session_token en profiles.
+   - Límite de tasa: máximo 3 solicitudes de recuperación de contraseña 
+     por hora por email.
+   - Transacciones: si falla el guardado del embedding facial después 
+     de crear el usuario, se elimina el usuario (rollback).
+
+
+3.4.3.2. Pruebas Realizadas y Resultados
+
+  ┌─────────────────────────────────┬────────────────────┬──────────────────────────────┐
+  │ Prueba                          │ Resultado Esperado │ Resultado Obtenido            │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Registro de usuario con rostro  │ Crea perfil +      │ Perfil creado, embedding      │
+  │ válido                          │ embedding facial   │ almacenado en face_embeddings │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Registro sin rostro (null)      │ Error 422          │ Rechazado: "Debes escanear    │
+  │                                 │                    │ tu rostro para completar      │
+  │                                 │                    │ el registro"                  │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Registro con imagen sin rostro  │ Error 422          │ Rechazado: "No se detectó     │
+  │                                 │                    │ un rostro"                    │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Registro con múltiples rostros  │ Error 422          │ Rechazado: "Se detectaron     │
+  │                                 │                    │ múltiples rostros"            │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Login con credenciales válidas  │ Token JWT +        │ Redirección al dashboard      │
+  │                                 │ redirección        │ según el rol del usuario      │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Login con RU inexistente        │ Error 401          │ "Usuario no encontrado o RU   │
+  │                                 │                    │ incorrecto"                   │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Login con contraseña incorrecta │ Error 401          │ "Credenciales incorrectas"    │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Login de cuenta deshabilitada   │ Error 401          │ "Tu cuenta ha sido            │
+  │                                 │                    │ deshabilitada por el          │
+  │                                 │                    │ administrador"                │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Votación exitosa                │ Voto registrado +  │ INSERT en votes exitoso,      │
+  │                                 │ auditoría          │ log en audit_logs             │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Doble voto en misma categoría   │ Error 400          | Rechazado por constraint      │
+  │                                 │                    │ UNIQUE en votes               │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Votación con rostro diferente   │ Error 401          │ Rechazado: verificación       │
+  │                                 │                    │ biométrica fallida            │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Crear elección (admin)          │ INSERT en          │ Elección visible en GET       │
+  │                                 │ elections          │ /elections/                   │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Elección vencida se cierra      │ status → 'closed'  │ update_expired_elections()    │
+  │ automáticamente                 │ automático         │ cierra en cada GET + tarea    │
+  │                                 │                    │ periódica cada 60s            │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Toggle estado de usuario (admin)│ is_active invertido│ Usuario deshabilitado no      │
+  │                                 │                    │ puede iniciar sesión          │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Cierre de sesión en todos       │ session_token      │ Todos los JWTs anteriores     │
+  │ los dispositivos                │ regenerado         │ son inválidos                 │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Cambio de contraseña            │ Contraseña         │ sign_in_with_password con     │
+  │                                 │ actualizada en Auth│ la nueva contraseña funciona  │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Exportar resultados (PDF/CSV)   │ Archivo generado   │ jsPDF genera PDF con QR;      │
+  │                                 │                    │ botón de exportación funciona  │
+  ├─────────────────────────────────┼────────────────────┼──────────────────────────────┤
+  │ Panel de auditoría              │ Registros          │ Paginación, filtros por       │
+  │                                 │ paginados y        │ acción, rol, resultado,       │
+  │                                 │ filtrables         │ fecha y búsqueda funcionan    │
+  └─────────────────────────────────┴────────────────────┴──────────────────────────────┘
+
+
+3.4.3.3. Resultados de la Verificación Biométrica
+
+  El modelo de reconocimiento facial (dlib HOG + SVM) genera vectores 
+  de 128 dimensiones. La comparación se realiza mediante distancia 
+  euclidiana con un umbral configurable (FACE_MATCH_THRESHOLD = 0.55).
+
+  Estrategia de detección (3 intentos, definidos en 
+  app/services/biometric/dlib_provider.py):
+
+    1. HOG con padding superior 20% (mejora detección de coronilla).
+    2. HOG sin padding (imagen original).
+    3. Ecualización de histograma + upsampling (imágenes con baja 
+       iluminación o contraste).
+
+  Si los 3 intentos fallan, el sistema rechaza la operación. Esto 
+  garantiza que ningún usuario pueda registrarse o votar sin un rostro 
+  válido y detectable.
+
+
+3.4.3.4. Endpoints de la API Verificados
+
+  La API expone 30+ endpoints agrupados en 8 routers:
+
+  ┌──────────────────────────┬──────────────────────────────────────────────────┐
+  │ Router                   │ Endpoints                                        │
+  ├──────────────────────────┼──────────────────────────────────────────────────┤
+  │ /api/v1/auth/*           │ register, login, forgot-password, verify-code,   │
+  │                          │ reset-password, change-password, logout-all      │
+  │ /api/v1/students/*       │ me, profile, photo, / (list), /{id} (delete)    │
+  │ /api/v1/elections/*      │ / (CRUD), categories, check-expired              │
+  │ /api/v1/candidates/*     │ / (CRUD)                                         │
+  │ /api/v1/votes/*          │ verify, / (cast), stats, history, carnet,        │
+  │                          │ verify-carnet                                    │
+  │ /api/v1/analytics/*      │ global-stats, /{election_id}                     │
+  │ /api/v1/audit/*          │ / (paginated), /acciones                         │
+  │ /api/v1/usuarios/*       │ / (list all), /{id}/estado (toggle)             │
+  └──────────────────────────┴──────────────────────────────────────────────────┘
+
+  Documentación interactiva generada automáticamente por FastAPI (Swagger 
+  UI) disponible en /docs.
+
+
+3.4.3.5. Conclusión de las Pruebas
+
+  El sistema UPEA Vota fue implementado exitosamente en un entorno de 
+  producción utilizando tecnologías modernas y de código abierto. Todas 
+  las funcionalidades críticas fueron verificadas:
+
+  - Registro biométrico con validación facial obligatoria.
+  - Autenticación multifactor (credenciales + reCAPTCHA + JWT).
+  - Votación electrónica con verificación biométrica en tiempo real.
+  - Control de voto único a nivel de base de datos.
+  - Panel administrativo completo con gestión de usuarios, elecciones, 
+    candidatos y auditoría.
+  - Cierre automático de elecciones vencidas.
+  - Despliegue continuo mediante GitHub + Render + Vercel.
+
+  El sistema cumple con los requisitos de seguridad, escalabilidad y 
+  usabilidad definidos para un proceso electoral universitario.
+
+
+===============================================================================
+FIN DE LA SECCIÓN 3.4
+===============================================================================
